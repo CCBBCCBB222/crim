@@ -8,7 +8,6 @@ local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
--- 每帧事件循环管理器
 local EventLoopManager = {
     IsRunning = false,
     TriggerCount = 0,
@@ -16,7 +15,6 @@ local EventLoopManager = {
     LastUpdate = tick()
 }
 
--- 获取事件对象
 local function getEvent()
     local events = ReplicatedStorage:FindFirstChild("Events")
     if not events then return nil end
@@ -25,7 +23,6 @@ local function getEvent()
     return event
 end
 
--- 触发新的事件函数
 local function fireEvent()
     local event = getEvent()
     if not event then return false end
@@ -47,7 +44,6 @@ local function fireEvent()
     return success
 end
 
--- 计算FPS
 local function updateFPS()
     local currentTime = tick()
     local deltaTime = currentTime - EventLoopManager.LastUpdate
@@ -59,7 +55,6 @@ local function updateFPS()
     end
 end
 
--- 飞行控制器
 local FlightController = {
     IsFlying = false,
     FlightSpeed = 1,
@@ -74,7 +69,6 @@ local FlightController = {
     DummyUpdateConnection = nil
 }
 
--- 创建静态自然站立姿势假身模型
 local function createDummyModel()
     if FlightController.DummyModel then
         FlightController.DummyModel:Destroy()
@@ -84,25 +78,25 @@ local function createDummyModel()
     local dummy = Instance.new("Model")
     dummy.Name = "FlightDummy"
     
-    -- 创建自然站立姿势部件位置（根据图片调整）
+    
     local standPoseOffsets = {
-        -- 躯干在中心
+        
         Torso = CFrame.new(0, 0, 0),
-        -- 头部在躯干上方
+        
         Head = CFrame.new(0, 1.5, 0),
-        -- 左臂自然下垂，稍微向前x.y.z 
+        
         ["Left Arm"] = CFrame.new(-1.5, 0, -0.2),
-        -- 右臂自然下垂，稍微向前
+        
         ["Right Arm"] = CFrame.new(1.5, 0, -0.2),
-        -- 左腿自然站立，稍微分开
+        
         ["Left Leg"] = CFrame.new(-0.5, -2, 0),
-        -- 右腿自然站立，稍微分开
+        
         ["Right Leg"] = CFrame.new(0.5, -2, 0),
-        -- HumanoidRootPart在躯干位置
+        
         HumanoidRootPart = CFrame.new(0, 0, 0)
     }
     
-    -- 创建假身部件（自然站立姿势）
+    
     for partName, offsetCFrame in pairs(standPoseOffsets) do
         local originalPart = Character:FindFirstChild(partName)
         if originalPart and originalPart:IsA("BasePart") then
@@ -116,12 +110,12 @@ local function createDummyModel()
             dummyPart.Reflectance = originalPart.Reflectance
             dummyPart.CanCollide = false
             
-            -- 关键：完全禁用物理
+            
             dummyPart.Anchored = true
             dummyPart.Locked = true
             dummyPart.Massless = true
             
-            -- 复制表面外观
+           
             for _, surface in pairs(Enum.NormalId:GetEnumItems()) do
                 local originalSurface = originalPart[surface.Name .. "Surface"]
                 if originalSurface then
@@ -129,14 +123,14 @@ local function createDummyModel()
                 end
             end
             
-            -- 复制特殊网格（如果有）
+            
             local specialMesh = originalPart:FindFirstChildOfClass("SpecialMesh")
             if specialMesh then
                 local newMesh = specialMesh:Clone()
                 newMesh.Parent = dummyPart
             end
             
-            -- 复制纹理和装饰物
+            
             for _, child in pairs(originalPart:GetChildren()) do
                 if child:IsA("Decal") or child:IsA("Texture") or child:IsA("SurfaceGui") then
                     local clone = child:Clone()
@@ -144,62 +138,62 @@ local function createDummyModel()
                 end
             end
             
-            -- 使用自然站立姿势位置
+           
             dummyPart.CFrame = HumanoidRootPart.CFrame:ToWorldSpace(offsetCFrame)
             dummyPart.Parent = dummy
         end
     end
     
-    -- 设置主部件
+   
     local primaryPart = dummy:FindFirstChild("HumanoidRootPart") or dummy:FindFirstChild("Torso") or dummy:FindFirstChildWhichIsA("BasePart")
     if primaryPart then
         dummy.PrimaryPart = primaryPart
     end
     
-    -- 不创建Humanoid，避免任何动画系统干扰
+    
     dummy.Parent = workspace
     
     return dummy
 end
     
 
--- 隐藏真实角色，显示假身
+
 local function showDummy()
-    -- 先停止所有动画
+    
     if Humanoid then
         local animator = Humanoid:FindFirstChildOfClass("Animator")
         if animator then
             for _, track in pairs(animator:GetPlayingAnimationTracks()) do
-                track:Stop(0.1) -- 平滑停止动画
+                track:Stop(0.1) 
             end
         end
     end
     
-    -- 等待一帧确保动画停止
+    
     wait(0.1)
     
-    -- 保存原始透明度
+    
     FlightController.OriginalCharacterTransparency = {}
     for _, part in pairs(Character:GetChildren()) do
         if part:IsA("BasePart") then
             FlightController.OriginalCharacterTransparency[part] = part.Transparency
-            part.Transparency = 1 -- 完全透明
+            part.Transparency = 1 
         end
     end
     
-    -- 创建假身（使用标准T-pose）
+    
     FlightController.DummyModel = createDummyModel()
     
     if FlightController.DummyModel and FlightController.DummyModel.PrimaryPart then
-        print("T-pose假身创建成功")
+        print
     else
-        print("假身创建失败")
+        print
     end
 end
 
--- 隐藏假身，显示真实角色
+
 local function hideDummy()
-    -- 恢复原始透明度
+    
     for part, transparency in pairs(FlightController.OriginalCharacterTransparency) do
         if part and part.Parent then
             part.Transparency = transparency
@@ -207,20 +201,20 @@ local function hideDummy()
     end
     FlightController.OriginalCharacterTransparency = {}
     
-    -- 删除假身更新连接
+    
     if FlightController.DummyUpdateConnection then
         FlightController.DummyUpdateConnection:Disconnect()
         FlightController.DummyUpdateConnection = nil
     end
     
-    -- 删除假身
+    
     if FlightController.DummyModel then
         FlightController.DummyModel:Destroy()
         FlightController.DummyModel = nil
     end
 end
 
--- 平滑更新假身位置
+
 local function setupDummyUpdate()
     if FlightController.DummyUpdateConnection then
         FlightController.DummyUpdateConnection:Disconnect()
@@ -231,12 +225,12 @@ local function setupDummyUpdate()
             return
         end
         
-        -- 直接同步整个假身模型的位置和旋转
+        
         FlightController.DummyModel:SetPrimaryPartCFrame(HumanoidRootPart.CFrame)
     end)
 end
 
--- 创建UI界面
+
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MobileFlightGUI"
 screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
@@ -257,7 +251,7 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 8)
 corner.Parent = mainFrame
 
--- 标题
+
 local title = Instance.new("TextLabel")
 title.Name = "Title"
 title.Parent = mainFrame
@@ -273,7 +267,7 @@ local titleCorner = Instance.new("UICorner")
 titleCorner.CornerRadius = UDim.new(0, 8)
 titleCorner.Parent = title
 
--- 主控制按钮
+
 local flyButton = Instance.new("TextButton")
 flyButton.Name = "FlyButton"
 flyButton.Parent = mainFrame
@@ -290,7 +284,7 @@ local buttonCorner = Instance.new("UICorner")
 buttonCorner.CornerRadius = UDim.new(0, 6)
 buttonCorner.Parent = flyButton
 
--- 状态指示器
+
 local statusDot = Instance.new("Frame")
 statusDot.Name = "StatusDot"
 statusDot.Size = UDim2.new(0, 10, 0, 10)
@@ -303,7 +297,7 @@ dotCorner.CornerRadius = UDim.new(1, 0)
 dotCorner.Parent = statusDot
 statusDot.Parent = flyButton
 
--- FPS计数器
+
 local fpsLabel = Instance.new("TextLabel")
 fpsLabel.Name = "FPSLabel"
 fpsLabel.Parent = mainFrame
@@ -315,7 +309,7 @@ fpsLabel.TextColor3 = Color3.fromRGB(150, 200, 255)
 fpsLabel.TextSize = 10
 fpsLabel.Font = Enum.Font.Gotham
 
--- 保存动画状态
+
 local function saveAnimationState()
     FlightController.AnimatorTracks = {}
     
@@ -332,7 +326,7 @@ local function saveAnimationState()
     end
 end
 
--- 恢复动画状态
+
 local function restoreAnimationState()
     if Humanoid then
         local animator = Humanoid:FindFirstChildOfClass("Animator")
@@ -349,7 +343,7 @@ local function restoreAnimationState()
     end
 end
 
--- 飞行逻辑
+
 function FlightController:Enable()
     if self.IsFlying then return end
     
@@ -365,7 +359,7 @@ function FlightController:Enable()
     Humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
     Humanoid.PlatformStand = true
     
-    -- 停止所有动画
+    
     if Humanoid then
         local animator = Humanoid:FindFirstChildOfClass("Animator")
         if animator then
@@ -449,7 +443,7 @@ function FlightController:Disable()
     print("飞行+事件循环已禁用")
 end
 
--- UI更新
+
 local function updateUI()
     fpsLabel.Text = "FPS: " .. EventLoopManager.FPS
 end
