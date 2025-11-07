@@ -1,0 +1,391 @@
+--如果你看见这个呵呵。
+
+local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local SoundService = game:GetService("SoundService")
+
+local MainAttack = ReplicatedStorage.Events.MainAttack
+
+Library.ShowToggleFrameInKeybinds = true
+Library.ShowCustomCursor = true
+Library.NotifySide = "Left"
+
+local Window = Library:CreateWindow({
+    Title = 'Ragebot',
+    Center = true,
+    AutoShow = true,
+    Resizable = true,
+    ShowCustomCursor = true,
+    NotifySide = "Left",
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+local Tabs = {
+    Main = Window:AddTab('Main'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
+}
+
+local RagebotGroupBox = Tabs.Main:AddLeftGroupbox('Ragebot')
+
+RagebotGroupBox:AddToggle('RagebotToggle', {
+    Text = 'Enable Ragebot',
+    Default = false,
+    Tooltip = 'Enable/Disable Ragebot function'
+})
+
+RagebotGroupBox:AddToggle('WallbangToggle', {
+    Text = 'skeet.gg',
+    Default = false,
+    Tooltip = 'Enable/Disable wallbang function'
+})
+
+RagebotGroupBox:AddDivider()
+
+local RaySettingsGroupBox = Tabs.Main:AddRightGroupbox('Ray Settings')
+
+RaySettingsGroupBox:AddDropdown('RayStartPosition', {
+    Values = {'fuck you', 'Player Position', 'Target Random Position'},
+    Default = 1,
+    Text = 'Ray Start Position',
+    Tooltip = 'Select ray start position'
+})
+
+RaySettingsGroupBox:AddLabel('Ray Color'):AddColorPicker('RayColor', {
+    Default = Color3.new(0, 1, 1), 
+    Title = 'Ray Color',
+    Transparency = 0
+})
+
+RaySettingsGroupBox:AddSlider('RaySize', {
+    Text = 'Ray Size',
+    Default = 1,
+    Min = 0.1,
+    Max = 5,
+    Rounding = 1,
+    Suffix = 'units',
+    Tooltip = 'Set ray thickness'
+})
+
+RaySettingsGroupBox:AddSlider('RayBrightness', {
+    Text = 'Ray Brightness',
+    Default = 1,
+    Min = 0,
+    Max = 2,
+    Rounding = 1,
+    Tooltip = 'Set ray brightness'
+})
+
+local LogGroupBox = Tabs.Main:AddLeftGroupbox('Log Settings')
+
+LogGroupBox:AddToggle('EnableVisualLogs', {
+    Text = 'Enable Visual Logs',
+    Default = true,
+    Tooltip = 'Enable/Disable hit visual logs'
+})
+
+local function playShootSound()
+    if not Toggles.RagebotToggle.Value then return end
+    
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxassetid://5043539486"
+    sound.Volume = 0.5
+    sound.Parent = Workspace
+    sound:Play()
+    
+    sound.Ended:Connect(function() sound:Destroy() end)
+    delay(10, function() if sound then sound:Destroy() end end)
+end
+
+local function createBeam(startPos, endPos)
+    if not Toggles.RagebotToggle.Value then return end
+    
+    local direction = (endPos - startPos).Unit
+   
+    local extendedEndPos = endPos + direction * 50  
+    
+    local distance = (startPos - extendedEndPos).Magnitude
+    
+    local beam = Instance.new("Part")
+    beam.Material = Enum.Material.Neon
+    beam.BrickColor = BrickColor.new("Cyan")
+    beam.Size = Vector3.new(Options.RaySize.Value, Options.RaySize.Value, distance)
+    beam.CFrame = CFrame.lookAt((startPos + extendedEndPos) / 2, extendedEndPos)
+    beam.Anchored = true
+    beam.CanCollide = false
+    beam.Transparency = 1.0
+    
+    local attachment0 = Instance.new("Attachment")
+    local attachment1 = Instance.new("Attachment")
+    attachment0.Position = Vector3.new(0, 0, -distance/2)
+    attachment1.Position = Vector3.new(0, 0, distance/2)
+    attachment0.Parent = beam
+    attachment1.Parent = beam
+    
+    local beamEffect = Instance.new("Beam")
+    beamEffect.Attachment0 = attachment0
+    beamEffect.Attachment1 = attachment1
+    
+    beamEffect.Color = ColorSequence.new(Options.RayColor.Value)
+    beamEffect.Width0 = Options.RaySize.Value
+    beamEffect.Width1 = Options.RaySize.Value
+    beamEffect.Texture = "rbxassetid://7136858729"
+    beamEffect.TextureLength = distance / 3
+    beamEffect.TextureSpeed = 1.5
+    beamEffect.LightEmission = Options.RayBrightness.Value
+    beamEffect.LightInfluence = 0
+    beamEffect.FaceCamera = true
+    beamEffect.Parent = beam
+    
+    beam.Parent = Workspace
+    
+    local fadeDuration = 2
+    local fadeSteps = 40
+    local fadeInterval = fadeDuration / fadeSteps
+    
+    coroutine.wrap(function()
+        for i = 1, fadeSteps do
+            if beam and beam.Parent then
+                local alpha = i / fadeSteps
+                local lightMultiplier = 1 - alpha
+                
+                beamEffect.Width0 = Options.RaySize.Value * lightMultiplier
+                beamEffect.Width1 = Options.RaySize.Value * lightMultiplier
+                beamEffect.LightEmission = Options.RayBrightness.Value * lightMultiplier
+                
+                beamEffect.Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, alpha * 0.5),
+                    NumberSequenceKeypoint.new(1, alpha * 0.8)
+                })
+                
+                wait(fadeInterval)
+            else
+                break
+            end
+        end
+        
+        if beam then beam:Destroy() end
+    end)()
+end
+
+local function getCurrentTool()
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer.Character then return nil end
+    return localPlayer.Character:FindFirstChildOfClass("Tool")
+end
+local function findNearestNPC()
+    local npcFolder = Workspace:FindFirstChild("#GAME")
+    if npcFolder then
+        npcFolder = npcFolder:FindFirstChild("Folders")
+        if npcFolder then
+            npcFolder = npcFolder:FindFirstChild("HumanoidFolder")
+            if npcFolder then
+                npcFolder = npcFolder:FindFirstChild("NPCFolder")
+                if npcFolder then
+                    local localPlayer = Players.LocalPlayer
+                    if not localPlayer.Character then return nil, nil end
+                    
+                    local humanoidRootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if not humanoidRootPart then return nil, nil end
+                    
+                    local localPosition = humanoidRootPart.Position
+                    local nearestNPC, nearestLimb, shortestDistance = nil, nil, math.huge
+                    local npcHealth, npcMaxHealth = 0, 0
+                    
+                    for _, npc in ipairs(npcFolder:GetChildren()) do
+                       
+                        if npc.Name ~= "CrackedBas" and npc:FindFirstChild("Humanoid") then
+                            local humanoid = npc.Humanoid
+                            if humanoid.Health > 0 then
+                                for _, limbName in ipairs({"Head", "UpperTorso", "HumanoidRootPart"}) do
+                                    local limb = npc:FindFirstChild(limbName)
+                                    if limb then
+                                        local distance = (localPosition - limb.Position).Magnitude
+                                        if distance <= 500 and distance < shortestDistance then
+                                            shortestDistance = distance
+                                            nearestNPC, nearestLimb = npc, limb
+                                            npcHealth, npcMaxHealth = humanoid.Health, humanoid.MaxHealth
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
+                    return nearestNPC, nearestLimb, shortestDistance, npcHealth, npcMaxHealth
+                end
+            end
+        end
+    end
+    return nil, nil, nil, 0, 0
+end
+
+
+local function calculateWallbangPosition(playerPosition, targetPosition)
+    
+    local direction = (targetPosition - playerPosition).Unit
+    
+    local offset = Vector3.new(
+        Options.WallbangOffsetX.Value,
+        Options.WallbangOffsetY.Value, 
+        Options.WallbangOffsetZ.Value
+    )
+    
+    local right = Vector3.new(1, 0, 0) 
+    local up = Vector3.new(0, 1, 0)    
+    local forward = direction          
+    
+    local offsetWorld = right * offset.X + up * offset.Y + forward * offset.Z
+    return playerPosition + offsetWorld
+end
+
+local function getRandomPositionAroundTarget(targetPosition, radius)
+    
+    local randomAngle = math.random() * 2 * math.pi
+    local randomDistance = math.random() * radius
+    
+    local x = targetPosition.X + math.cos(randomAngle) * randomDistance
+    local z = targetPosition.Z + math.sin(randomAngle) * randomDistance
+    
+    local y = targetPosition.Y + (math.random() - 0.5) * 3  
+    
+    return Vector3.new(x, y, z)
+end
+
+local function calculateRayStartPosition(playerPosition, targetPosition)
+    local rayStartMode = Options.RayStartPosition.Value
+    
+    if rayStartMode == 'Wallbang Position' then
+    
+        return calculateWallbangPosition(playerPosition, targetPosition)
+        
+    elseif rayStartMode == 'Player Position' then
+       
+        return playerPosition
+        
+    elseif rayStartMode == 'Target Random Position' then
+        
+        return getRandomPositionAroundTarget(targetPosition, 10)
+    end
+    
+    return playerPosition
+end
+
+local function calculateRayEndPosition(startPos, targetPos)
+    
+    local direction = (targetPos - startPos).Unit
+    
+    return targetPos + direction * 50  
+end
+
+local function showHitNotification(message)
+    if Toggles.EnableVisualLogs.Value then
+        Library:Notify(message, 0.5)  
+    end
+end
+
+local function autoShoot()
+    if not Toggles.RagebotToggle.Value then return end
+    
+    local tool = getCurrentTool()
+    if not tool then return end
+    
+    local npc, limb, distance, npcHealth, npcMaxHealth = findNearestNPC()
+    if not npc or not limb then return end
+    
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer.Character then return end
+    
+    local playerRoot = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not playerRoot then return end
+    
+    local playerPos = playerRoot.Position
+    local targetPos = limb.Position
+    
+    local direction = (targetPos - playerPos).Unit
+    
+    local wallbangPos = playerPos
+    if Toggles.WallbangToggle.Value then
+        wallbangPos = calculateWallbangPosition(playerPos, targetPos)
+    end
+    
+    local rayStartPos = calculateRayStartPosition(playerPos, targetPos)
+    local rayMode = Options.RayStartPosition.Value
+    
+    
+    local rayEndPos = calculateRayEndPosition(rayStartPos, targetPos)
+    
+    playShootSound()
+    
+    
+    createBeam(rayStartPos, rayEndPos)
+    
+    local shotData = {
+        FD = direction,
+        SD = direction,
+        FO = wallbangPos,  
+        T = tool,
+        AN = tool.Name,
+        H = limb,
+        BM = distance,
+        RP = playerPos,
+        HP = targetPos,
+        SP = wallbangPos
+    }
+    
+    local success, error = pcall(function()
+        MainAttack:FireServer(shotData)
+    end)
+    
+    if success then
+        local healthPercent = math.floor((npcHealth / npcMaxHealth) * 100)
+        
+        local notificationMessage = string.format(" %s / %s (%s) / %.1fm / %d%%", 
+            tool.Name, npc.Name, limb.Name, distance, healthPercent)
+        
+        showHitNotification(notificationMessage)
+        
+        print("tool " .. tool.Name .. " / " .. npc.Name .. " / " .. limb.Name .. " / " .. string.format("%.1f", distance) .. "m / HP: " .. healthPercent .. "%")
+    else
+        if Toggles.EnableVisualLogs.Value then
+            Library:Notify(" Shot failed: " .. tostring(error), 0.5)
+        end
+    end
+end
+
+coroutine.wrap(function()
+    while true do
+        pcall(autoShoot)
+        wait(0.09)
+    end
+end)()
+
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+MenuGroup:AddToggle("KeybindMenuOpen", { Default = Library.KeybindFrame.Visible, Text = "Open Keybind Menu", Callback = function(value) Library.KeybindFrame.Visible = value end})
+MenuGroup:AddToggle("ShowCustomCursor", {Text = "Custom Cursor", Default = true, Callback = function(Value) Library.ShowCustomCursor = Value end})
+MenuGroup:AddDivider()
+MenuGroup:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", { Default = "RightShift", NoUI = true, Text = "Menu Keybind" })
+MenuGroup:AddButton("Unload", function() Library:Unload() end)
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+ThemeManager:SetFolder('My Script Center')
+SaveManager:SetFolder('My Script Center/Ragebot')
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+SaveManager:LoadAutoloadConfig()
+
+Library:SetWatermarkVisibility(false)
