@@ -218,6 +218,6 @@ coroutine.wrap(function()
         pcall(function()
             shootAtNearestPlayer()
         end)
-        wait(0.5)
+        wait(0.01)
     end
 end)()
