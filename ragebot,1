@@ -88,9 +88,9 @@ RaySettingsGroupBox:AddSlider('RayBrightness', {
 local LogGroupBox = Tabs.Main:AddLeftGroupbox('Log Settings')
 
 LogGroupBox:AddToggle('EnableVisualLogs', {
-    Text = 'Enable Visual Logs',
+    Text = 'Enable hit visual',
     Default = true,
-    Tooltip = 'Enable/Disable hit visual logs'
+    Tooltip = 'Enable/Disable hit visual'
 })
 
 local function playShootSound()
