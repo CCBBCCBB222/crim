@@ -1,0 +1,223 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local function findNearestPlayer()
+    local localPlayer = Players.LocalPlayer
+    local nearestPlayer, shortestDistance = nil, math.huge
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character then
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            local head = player.Character:FindFirstChild("Head")
+            
+            if humanoid and humanoid.Health > 0 and head then
+                local distance = (localPlayer.Character.HumanoidRootPart.Position - head.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    nearestPlayer = player
+                end
+            end
+        end
+    end
+    
+    return nearestPlayer, shortestDistance
+end
+
+local function getCurrentTool()
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer.Character then return nil end
+    return localPlayer.Character:FindFirstChildOfClass("Tool")
+end
+
+local function createBeam(startPos, endPos)
+    local distance = (startPos - endPos).Magnitude
+    
+    local beam = Instance.new("Part")
+    beam.Material = Enum.Material.Neon
+    beam.BrickColor = BrickColor.new("Cyan")
+    beam.Size = Vector3.new(0.5, 0.5, distance)
+    beam.CFrame = CFrame.lookAt((startPos + endPos) / 2, endPos)
+    beam.Anchored = true
+    beam.CanCollide = false
+    beam.Transparency = 1.0
+    
+    local attachment0 = Instance.new("Attachment")
+    local attachment1 = Instance.new("Attachment")
+    attachment0.Position = Vector3.new(0, 0, -distance/2)
+    attachment1.Position = Vector3.new(0, 0, distance/2)
+    attachment0.Parent = beam
+    attachment1.Parent = beam
+    
+    local beamEffect = Instance.new("Beam")
+    beamEffect.Attachment0 = attachment0
+    beamEffect.Attachment1 = attachment1
+    
+    beamEffect.Color = ColorSequence.new(Color3.new(0, 1, 1))
+    beamEffect.Width0 = 0.5
+    beamEffect.Width1 = 0.5
+    beamEffect.Texture = "rbxassetid://7136858729"
+    beamEffect.TextureLength = distance / 3
+    beamEffect.TextureSpeed = 1.5
+    beamEffect.LightEmission = 1
+    beamEffect.LightInfluence = 0
+    beamEffect.FaceCamera = true
+    beamEffect.Parent = beam
+    
+    beam.Parent = Workspace
+    
+    local fadeDuration = 2
+    local fadeSteps = 40
+    local fadeInterval = fadeDuration / fadeSteps
+    
+    coroutine.wrap(function()
+        for i = 1, fadeSteps do
+            if beam and beam.Parent then
+                local alpha = i / fadeSteps
+                local lightMultiplier = 1 - alpha
+                
+                beamEffect.Width0 = 0.5 * lightMultiplier
+                beamEffect.Width1 = 0.5 * lightMultiplier
+                beamEffect.LightEmission = 1 * lightMultiplier
+                
+                beamEffect.Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, alpha * 0.5),
+                    NumberSequenceKeypoint.new(1, alpha * 0.8)
+                })
+                
+                wait(fadeInterval)
+            else
+                break
+            end
+        end
+        
+        if beam then beam:Destroy() end
+    end)()
+    
+    return beam
+end
+
+local function createShootArgs(targetPlayer, weapon)
+    if not targetPlayer or not targetPlayer.Character or not weapon then
+        return nil
+    end
+    
+    local localPlayer = Players.LocalPlayer
+    local head = targetPlayer.Character:FindFirstChild("Head")
+    
+    if not head then return nil end
+    
+    local targetPos = head.Position
+    local playerPos = localPlayer.Character.HumanoidRootPart.Position
+    
+    local direction = (targetPos - playerPos).Unit
+    
+    local args = {
+        [1] = weapon,
+        [2] = head,
+        [3] = targetPos,
+        [4] = {
+            [1] = {
+                [1] = playerPos,
+                [2] = direction,
+                [3] = (targetPos - playerPos).Magnitude
+            },
+            [2] = {}
+        },
+        [5] = Vector3.new(0, 1, 0),
+        [6] = {
+            ["Mode"] = "Auto",
+            ["MaxSpread"] = 47,
+            ["MaxRecoilPower"] = 3,
+            ["Distance"] = 3200,
+            ["BSpeed"] = 2500,
+            ["FireRate"] = 600
+        }
+    }
+    
+    args[4][2] = args[4][1]
+    
+    return args, playerPos, targetPos
+end
+
+local function fireGunEvent()
+    local args = {
+        [1] = {
+            [1] = Vector3.new(-0.40720272064208984, -0.13815894722938538, 0.902827799320221)
+        },
+        [2] = game:GetService("Players").LocalPlayer.Character.AK47,
+        [3] = game:GetService("Players").LocalPlayer.Character.SAK47,
+        [4] = Vector3.new(853.695068359375, 67.79114532470703, -4806.09423828125),
+        [5] = false
+    }
+    
+    pcall(function()
+        ReplicatedStorage.BulletFireSystem.FireGun:FireServer(unpack(args))
+    end)
+end
+
+local function fireGunAnimEvent()
+    local args = {
+        [1] = 0.1,
+        [2] = {
+            ["LeftAim"] = CFrame.new(1.399999976158142, 0.25, -1.4500000476837158) * CFrame.Angles(-2.094395160675049, 0.6108652353286743, -0.4363323450088501),
+            ["ChamberAnim"] = function()end,
+            ["SprintAnim"] = function()end,
+            ["LeftSprint"] = CFrame.new(1.25, 1.149999976158142, -1.350000023841858) * CFrame.Angles(-1.0471975803375244, 0.6108652353286743, -0.4363323450088501),
+            ["ReloadAnim"] = function()end,
+            ["RightSprint"] = CFrame.new(-1, 0.5, -1.25) * CFrame.Angles(-1.0471975803375244, 0, -0),
+            ["IdleAnim"] = function()end,
+            ["EquipAnim"] = function()end,
+            ["ShootPos"] = CFrame.new(0, 0, 0.25) * CFrame.Angles(-0, 0, -0),
+            ["RightAim"] = CFrame.new(-0.574999988079071, 0.10000000149011612, -1) * CFrame.Angles(-1.5707963705062866, 0, 0),
+            ["ChamberBKAnim"] = function()end
+        },
+        [3] = game:GetService("Players").LocalPlayer.Character.AK47
+    }
+    
+    pcall(function()
+        ReplicatedStorage.ACS_Engine.Events.ServerGunAnim:FireServer(unpack(args))
+    end)
+end
+
+local function shootAtNearestPlayer()
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer.Character then 
+        return 
+    end
+    
+    local weapon = getCurrentTool()
+    if not weapon then
+        return
+    end
+    
+    local targetPlayer, distance = findNearestPlayer()
+    if not targetPlayer then
+        return
+    end
+    
+    local args, playerPos, targetPos = createShootArgs(targetPlayer, weapon)
+    if not args then 
+        return 
+    end
+    
+    fireGunEvent()
+    fireGunAnimEvent()
+    
+    local success, error = pcall(function()
+        ReplicatedStorage.BulletFireSystem.BulletHit:FireServer(unpack(args))
+    end)
+    
+    if success then
+        createBeam(playerPos, targetPos)
+    end
+end
+
+coroutine.wrap(function()
+    while true do
+        pcall(function()
+            shootAtNearestPlayer()
+        end)
+        wait(0.5)
+    end
+end)()
