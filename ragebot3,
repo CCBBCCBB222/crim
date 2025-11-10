@@ -1,6 +1,28 @@
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ATLASTEAM01/Libraries/refs/heads/main/Utopia/Library.lua"))()
+
+local Window = Library:Window({
+    Name = "CC AS",
+    GradientTitle = {
+        Enabled = true,
+        Start = Color3.fromRGB(255, 255, 255),
+        Middle = Color3.fromRGB(0, 251, 255),
+        End = Color3.fromRGB(50, 135, 168),
+        Speed = 1
+    }
+})
+
+local CombatTab = Window:Page({Name = "ragebot", Columns = 2})
+local RagebotSection = CombatTab:Section({Name = "Ragebot", Side = 1})
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+
+local RagebotEnabled = false
+local RagebotThread = nil
+local RagebotInterval = 0.5
+local RayStartMode = "Player Body" 
+local MaxLockDistance = 500 
 
 local function findNearestPlayer()
     local localPlayer = Players.LocalPlayer
@@ -13,7 +35,8 @@ local function findNearestPlayer()
             
             if humanoid and humanoid.Health > 0 and head then
                 local distance = (localPlayer.Character.HumanoidRootPart.Position - head.Position).Magnitude
-                if distance < shortestDistance then
+                
+                if distance < shortestDistance and distance <= MaxLockDistance then
                     shortestDistance = distance
                     nearestPlayer = player
                 end
@@ -108,7 +131,20 @@ local function createShootArgs(targetPlayer, weapon)
     if not head then return nil end
     
     local targetPos = head.Position
-    local playerPos = localPlayer.Character.HumanoidRootPart.Position
+   
+    local playerPos
+    if RayStartMode == "Near Enemy" then
+
+        local randomOffset = Vector3.new(
+            (math.random() - 0.5) * 60,  
+            (math.random() - 0.5) * 60,  
+            (math.random() - 0.5) * 60   
+        )
+        playerPos = targetPos + randomOffset
+    else 
+    
+        playerPos = localPlayer.Character.HumanoidRootPart.Position
+    end
     
     local direction = (targetPos - playerPos).Unit
     
@@ -180,7 +216,20 @@ local function fireGunAnimEvent()
     end)
 end
 
+local function playShootSound()
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxassetid://5043539486"  
+    sound.Volume = 0.5
+    sound.Parent = Workspace
+    sound:Play()
+    
+    sound.Ended:Connect(function() sound:Destroy() end)
+    delay(10, function() if sound then sound:Destroy() end end)
+end
+
 local function shootAtNearestPlayer()
+    if not RagebotEnabled then return end
+    
     local localPlayer = Players.LocalPlayer
     if not localPlayer.Character then 
         return 
@@ -196,6 +245,10 @@ local function shootAtNearestPlayer()
         return
     end
     
+    if distance > MaxLockDistance then
+        return
+    end
+    
     local args, playerPos, targetPos = createShootArgs(targetPlayer, weapon)
     if not args then 
         return 
@@ -203,6 +256,7 @@ local function shootAtNearestPlayer()
     
     fireGunEvent()
     fireGunAnimEvent()
+    playShootSound()  
     
     local success, error = pcall(function()
         ReplicatedStorage.BulletFireSystem.BulletHit:FireServer(unpack(args))
@@ -213,11 +267,115 @@ local function shootAtNearestPlayer()
     end
 end
 
-coroutine.wrap(function()
-    while true do
-        pcall(function()
-            shootAtNearestPlayer()
-        end)
-        wait(0.01)
+local function startRagebot()
+    RagebotEnabled = true
+    RagebotThread = coroutine.wrap(function()
+        while RagebotEnabled do
+            pcall(shootAtNearestPlayer)
+            wait(RagebotInterval)  
+        end
+    end)()
+    RagebotThread()
+end
+
+local function stopRagebot()
+    RagebotEnabled = false
+    if RagebotThread then
+        coroutine.close(RagebotThread)
+        RagebotThread = nil
     end
-end)()
+end
+
+local RagebotToggle = RagebotSection:Toggle({
+    Name = "Ragebot", 
+    Default = false, 
+    Flag = "RagebotToggle",
+    Callback = function(Value)
+        if Value then
+            startRagebot()
+        else
+            stopRagebot()
+        end
+    end
+})
+
+local SpeedSlider = RagebotSection:Slider({
+    Name = "Ragebot/s", 
+    Flag = "RagebotSpeed", 
+    Min = 0.01, 
+    Default = 0.5, 
+    Max = 10, 
+    Suffix = "s", 
+    Decimals = 0.1, 
+    Callback = function(Value)
+        RagebotInterval = Value
+    end
+})
+
+local DistanceSlider = RagebotSection:Slider({
+    Name = "Distance", 
+    Flag = "LockDistance", 
+    Min = 50, 
+    Default = 500, 
+    Max = 2000, 
+    Suffix = "m", 
+    Decimals = 0.01, 
+    Callback = function(Value)
+        MaxLockDistance = Value
+    end
+})
+
+local RaySettingsSection = CombatTab:Section({Name = "Ray Settings", Side = 2})
+
+RaySettingsSection:Toggle({
+    Name = "Enable Ray", 
+    Default = true, 
+    Flag = "EnableRay",
+    Callback = function(Value)
+    end
+})
+
+RaySettingsSection:Dropdown({
+    Name = "Ray Start Point", 
+    Flag = "RayStartMode", 
+    Items = {"Player Body", "Near Enemy"}, 
+    Default = "Player Body",
+    Callback = function(Value)
+        if Value == "Near Enemy" then
+            RayStartMode = "Near Enemy"
+        else
+            RayStartMode = "Player Body"
+        end
+    end
+})
+
+RaySettingsSection:Slider({
+    Name = "Ray Size", 
+    Flag = "RaySize", 
+    Min = 0.1, 
+    Default = 0.5, 
+    Max = 5, 
+    Suffix = "units", 
+    Decimals = 0.1, 
+    Callback = function(Value)
+    end
+})
+
+RaySettingsSection:Slider({
+    Name = "Ray Brightness", 
+    Flag = "RayBrightness", 
+    Min = 0, 
+    Default = 1, 
+    Max = 2, 
+    Decimals = 0.1, 
+    Callback = function(Value)
+    end
+})
+
+RaySettingsSection:Label("Ray Color", "Left"):Colorpicker({ 
+    Name = "Ray Color", 
+    Flag = "RayColor", 
+    Default = Color3.fromRGB(0, 255, 255), 
+    Callback = function(Value, Alpha)
+    end
+})
