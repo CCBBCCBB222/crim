@@ -12,7 +12,8 @@ local Window = Library:Window({
 })
 
 local CombatTab = Window:Page({Name = "ragebot", Columns = 2})
-local RagebotSection = CombatTab:Section({Name = "Ragebot", Side = 1})
+local MainTab = Window:Page({Name = "Main", Columns = 1})
+local RagebotSection = CombatTab:Section({Name = "ragebot", Side = 1})
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,7 +23,41 @@ local RagebotEnabled = false
 local RagebotThread = nil
 local RagebotInterval = 0.5
 local RayStartMode = "Player Body" 
-local MaxLockDistance = 500 
+local MaxLockDistance = 500
+local CameraModeEnabled = false
+local CameraModeThread = nil
+local RayEnabled = true
+local RaySize = 0.5
+local RayBrightness = 1
+local RayColor = Color3.new(0, 1, 1)
+
+local function setCameraToScalable()
+    local localPlayer = Players.LocalPlayer
+    if localPlayer then
+        localPlayer.CameraMode = Enum.CameraMode.Classic
+    end
+end
+
+local function cameraModeLoop()
+    while CameraModeEnabled do
+        pcall(setCameraToScalable)
+        wait(0.1) 
+    end
+end
+
+local function startCameraMode()
+    CameraModeEnabled = true
+    CameraModeThread = coroutine.wrap(cameraModeLoop)()
+    CameraModeThread()
+end
+
+local function stopCameraMode()
+    CameraModeEnabled = false
+    if CameraModeThread then
+        coroutine.close(CameraModeThread)
+        CameraModeThread = nil
+    end
+end
 
 local function findNearestPlayer()
     local localPlayer = Players.LocalPlayer
@@ -54,12 +89,14 @@ local function getCurrentTool()
 end
 
 local function createBeam(startPos, endPos)
+    if not RayEnabled then return nil end
+    
     local distance = (startPos - endPos).Magnitude
     
     local beam = Instance.new("Part")
     beam.Material = Enum.Material.Neon
     beam.BrickColor = BrickColor.new("Cyan")
-    beam.Size = Vector3.new(0.5, 0.5, distance)
+    beam.Size = Vector3.new(RaySize, RaySize, distance)
     beam.CFrame = CFrame.lookAt((startPos + endPos) / 2, endPos)
     beam.Anchored = true
     beam.CanCollide = false
@@ -76,13 +113,13 @@ local function createBeam(startPos, endPos)
     beamEffect.Attachment0 = attachment0
     beamEffect.Attachment1 = attachment1
     
-    beamEffect.Color = ColorSequence.new(Color3.new(0, 1, 1))
-    beamEffect.Width0 = 0.5
-    beamEffect.Width1 = 0.5
+    beamEffect.Color = ColorSequence.new(RayColor)
+    beamEffect.Width0 = RaySize
+    beamEffect.Width1 = RaySize
     beamEffect.Texture = "rbxassetid://7136858729"
     beamEffect.TextureLength = distance / 3
     beamEffect.TextureSpeed = 1.5
-    beamEffect.LightEmission = 1
+    beamEffect.LightEmission = RayBrightness
     beamEffect.LightInfluence = 0
     beamEffect.FaceCamera = true
     beamEffect.Parent = beam
@@ -99,9 +136,9 @@ local function createBeam(startPos, endPos)
                 local alpha = i / fadeSteps
                 local lightMultiplier = 1 - alpha
                 
-                beamEffect.Width0 = 0.5 * lightMultiplier
-                beamEffect.Width1 = 0.5 * lightMultiplier
-                beamEffect.LightEmission = 1 * lightMultiplier
+                beamEffect.Width0 = RaySize * lightMultiplier
+                beamEffect.Width1 = RaySize * lightMultiplier
+                beamEffect.LightEmission = RayBrightness * lightMultiplier
                 
                 beamEffect.Transparency = NumberSequence.new({
                     NumberSequenceKeypoint.new(0, alpha * 0.5),
@@ -133,17 +170,45 @@ local function createShootArgs(targetPlayer, weapon)
     local targetPos = head.Position
    
     local playerPos
+    local beamEndPos = targetPos
+    
     if RayStartMode == "Near Enemy" then
-
+  
         local randomOffset = Vector3.new(
             (math.random() - 0.5) * 60,  
             (math.random() - 0.5) * 60,  
             (math.random() - 0.5) * 60   
         )
         playerPos = targetPos + randomOffset
+        
+        local targetRandomOffset = Vector3.new(
+            (math.random() - 0.5) * 20,  
+            (math.random() - 0.5) * 20,  
+            (math.random() - 0.5) * 20   
+        )
+        targetPos = targetPos + targetRandomOffset
+        
+        local direction = (targetPos - playerPos).Unit
+        beamEndPos = targetPos + (direction * 10)
+    elseif RayStartMode == "360 Random" then
+
+        local selfRandomOffset = Vector3.new(
+            (math.random() - 0.5) * 30,  
+            (math.random() - 0.5) * 30,  
+            (math.random() - 0.5) * 30   
+        )
+        playerPos = localPlayer.Character.HumanoidRootPart.Position + selfRandomOffset
+        
+        local targetRandomOffset = Vector3.new(
+            (math.random() - 0.5) * 10,  
+            (math.random() - 0.5) * 10,  
+            (math.random() - 0.5) * 10   
+        )
+        targetPos = targetPos + targetRandomOffset
+        beamEndPos = targetPos
     else 
-    
         playerPos = localPlayer.Character.HumanoidRootPart.Position
+        beamEndPos = targetPos
     end
     
     local direction = (targetPos - playerPos).Unit
@@ -173,7 +238,7 @@ local function createShootArgs(targetPlayer, weapon)
     
     args[4][2] = args[4][1]
     
-    return args, playerPos, targetPos
+    return args, playerPos, beamEndPos
 end
 
 local function fireGunEvent()
@@ -249,7 +314,7 @@ local function shootAtNearestPlayer()
         return
     end
     
-    local args, playerPos, targetPos = createShootArgs(targetPlayer, weapon)
+    local args, playerPos, beamEndPos = createShootArgs(targetPlayer, weapon)
     if not args then 
         return 
     end
@@ -263,7 +328,7 @@ local function shootAtNearestPlayer()
     end)
     
     if success then
-        createBeam(playerPos, targetPos)
+        createBeam(playerPos, beamEndPos)
     end
 end
 
@@ -306,7 +371,7 @@ local SpeedSlider = RagebotSection:Slider({
     Default = 0.5, 
     Max = 10, 
     Suffix = "s", 
-    Decimals = 0.1, 
+    Decimals = 0.01, 
     Callback = function(Value)
         RagebotInterval = Value
     end
@@ -315,11 +380,11 @@ local SpeedSlider = RagebotSection:Slider({
 local DistanceSlider = RagebotSection:Slider({
     Name = "Distance", 
     Flag = "LockDistance", 
-    Min = 50, 
+    Min = 0, 
     Default = 500, 
-    Max = 2000, 
+    Max = 3600, 
     Suffix = "m", 
-    Decimals = 0.01, 
+    Decimals = 1, 
     Callback = function(Value)
         MaxLockDistance = Value
     end
@@ -332,20 +397,17 @@ RaySettingsSection:Toggle({
     Default = true, 
     Flag = "EnableRay",
     Callback = function(Value)
+        RayEnabled = Value
     end
 })
 
 RaySettingsSection:Dropdown({
     Name = "Ray Start Point", 
     Flag = "RayStartMode", 
-    Items = {"Player Body", "Near Enemy"}, 
+    Items = {"Player Body", "Near Enemy", "Random"}, 
     Default = "Player Body",
     Callback = function(Value)
-        if Value == "Near Enemy" then
-            RayStartMode = "Near Enemy"
-        else
-            RayStartMode = "Player Body"
-        end
+        RayStartMode = Value
     end
 })
 
@@ -356,8 +418,9 @@ RaySettingsSection:Slider({
     Default = 0.5, 
     Max = 5, 
     Suffix = "units", 
-    Decimals = 0.1, 
+    Decimals = 0.01, 
     Callback = function(Value)
+        RaySize = Value
     end
 })
 
@@ -367,8 +430,9 @@ RaySettingsSection:Slider({
     Min = 0, 
     Default = 1, 
     Max = 2, 
-    Decimals = 0.1, 
+    Decimals = 0.01, 
     Callback = function(Value)
+        RayBrightness = Value
     end
 })
 
@@ -377,5 +441,21 @@ RaySettingsSection:Label("Ray Color", "Left"):Colorpicker({
     Flag = "RayColor", 
     Default = Color3.fromRGB(0, 255, 255), 
     Callback = function(Value, Alpha)
+        RayColor = Value
+    end
+})
+
+local MainSection = MainTab:Section({Name = "Playes", Side = 1})
+
+local CameraToggle = MainSection:Toggle({
+    Name = "Camera Mode ", 
+    Default = false, 
+    Flag = "CameraModeToggle",
+    Callback = function(Value)
+        if Value then
+            startCameraMode()
+        else
+            stopCameraMode()
+        end
     end
 })
