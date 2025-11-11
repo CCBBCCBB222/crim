@@ -30,6 +30,12 @@ local RayEnabled = true
 local RaySize = 0.5
 local RayBrightness = 1
 local RayColor = Color3.new(0, 1, 1)
+local FilterRespawnAura = true 
+local RayFadeDuration = 2
+
+local Whitelist = {}
+local Blacklist = {}
+local PlayerInput = ""
 
 local function setCameraToScalable()
     local localPlayer = Players.LocalPlayer
@@ -59,12 +65,85 @@ local function stopCameraMode()
     end
 end
 
+local function hasRespawnAura(player)
+    if not FilterRespawnAura then return false end
+    
+    if player and player.Character then
+ 
+        local character = player.Character
+        
+        if character:FindFirstChildOfClass("ForceField") then
+            return true
+        end
+        
+        local auraNames = {
+            "RespawnAura", "SpawnProtection", "Invincibility", 
+            "GodMode", "SpawnShield", "SpawnInvincibility",
+            "SpawnProtect", "RespawnShield", "RespawnProtection"
+        }
+        
+        for _, name in ipairs(auraNames) do
+            if character:FindFirstChild(name) then
+                return true
+            end
+        end
+        
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            
+            if humanoid:GetAttribute("Invincible") or humanoid:GetAttribute("SpawnProtection") then
+                return true
+            end
+        end
+        
+        for _, child in ipairs(character:GetDescendants()) do
+            if child:IsA("ParticleEmitter") then
+                local name = child.Name:lower()
+                if name:find("spawn") or name:find("respawn") or name:find("aura") or name:find("shield") then
+                    return true
+                end
+            end
+        end
+    end
+    
+    return false
+end
+
+local function isPlayerInList(player, list)
+    if not player then return false end
+    
+    local playerName = player.Name:lower()
+    local displayName = player.DisplayName:lower()
+    
+    for _, name in ipairs(list) do
+        local listName = name:lower()
+        if playerName == listName or displayName == listName then
+            return true
+        end
+    end
+    
+    return false
+end
+
 local function findNearestPlayer()
     local localPlayer = Players.LocalPlayer
     local nearestPlayer, shortestDistance = nil, math.huge
     
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer and player.Character then
+            
+            if #Blacklist > 0 and isPlayerInList(player, Blacklist) then
+                continue
+            end
+            
+            if #Whitelist > 0 and not isPlayerInList(player, Whitelist) then
+                continue
+            end
+            
+            if FilterRespawnAura and hasRespawnAura(player) then
+                continue
+            end
+            
             local humanoid = player.Character:FindFirstChild("Humanoid")
             local head = player.Character:FindFirstChild("Head")
             
@@ -126,7 +205,7 @@ local function createBeam(startPos, endPos)
     
     beam.Parent = Workspace
     
-    local fadeDuration = 2
+    local fadeDuration = RayFadeDuration
     local fadeSteps = 40
     local fadeInterval = fadeDuration / fadeSteps
     
@@ -173,7 +252,6 @@ local function createShootArgs(targetPlayer, weapon)
     local beamEndPos = targetPos
     
     if RayStartMode == "Near Enemy" then
-  
         local randomOffset = Vector3.new(
             (math.random() - 0.5) * 60,  
             (math.random() - 0.5) * 60,  
@@ -190,8 +268,7 @@ local function createShootArgs(targetPlayer, weapon)
         
         local direction = (targetPos - playerPos).Unit
         beamEndPos = targetPos + (direction * 10)
-    elseif RayStartMode == "360 Random" then
-
+    elseif RayStartMode == "Random" then
         local selfRandomOffset = Vector3.new(
             (math.random() - 0.5) * 30,  
             (math.random() - 0.5) * 30,  
@@ -390,6 +467,65 @@ local DistanceSlider = RagebotSection:Slider({
     end
 })
 
+local FilterAuraToggle = RagebotSection:Toggle({
+    Name = "Filter Respawn", 
+    Default = true, 
+    Flag = "FilterAuraToggle",
+    Callback = function(Value)
+        FilterRespawnAura = Value
+    end
+})
+
+RagebotSection:Label("Player List System(测试版。", "Left")
+
+local PlayerInputBox = RagebotSection:Textbox({
+    Name = "Player Name",
+    Flag = "PlayerInput",
+    Default = "",
+    Placeholder = "Enter player name",
+    Callback = function(Value)
+        PlayerInput = Value
+    end
+})
+
+--懒得改名字。还有这个是给狗看的。
+
+RagebotSection:Button({
+    Name = "Add to blacklist",
+    Callback = function()
+        if PlayerInput ~= "" then
+            table.insert(Whitelist, PlayerInput)
+            Library:Notification("Added " .. PlayerInput .. " to blacklist", 3, Color3.fromRGB(0, 255, 0))
+        end
+    end
+})
+
+RagebotSection:Button({
+    Name = "Add to whitelist",
+    Callback = function()
+        if PlayerInput ~= "" then
+            table.insert(Blacklist, PlayerInput)
+            Library:Notification("Added " .. PlayerInput .. " to whitelist", 3, Color3.fromRGB(255, 0, 0))
+        end
+    end
+})
+
+RagebotSection:Button({
+    Name = "Clear Whitelist",
+    Callback = function()
+        Whitelist = {}
+        Library:Notification("Whitelist cleared", 3, Color3.fromRGB(0, 255, 0))
+    end
+})
+
+RagebotSection:Button({
+    Name = "Clear Blacklist",
+    Callback = function()
+        Blacklist = {}
+        Library:Notification("Blacklist cleared", 3, Color3.fromRGB(255, 0, 0))
+    end
+})
+
 local RaySettingsSection = CombatTab:Section({Name = "Ray Settings", Side = 2})
 
 RaySettingsSection:Toggle({
@@ -433,6 +569,19 @@ RaySettingsSection:Slider({
     Decimals = 0.01, 
     Callback = function(Value)
         RayBrightness = Value
+    end
+})
+
+RaySettingsSection:Slider({
+    Name = "Ray Fade Time", 
+    Flag = "RayFadeTime", 
+    Min = 0.1, 
+    Default = 2, 
+    Max = 10, 
+    Suffix = "s", 
+    Decimals = 0.1, 
+    Callback = function(Value)
+        RayFadeDuration = Value
     end
 })
 
