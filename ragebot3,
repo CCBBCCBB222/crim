@@ -34,19 +34,7 @@ local FilterRespawnAura = true
 local RayFadeDuration = 2
 local RandomRayColor = false
 
-local Whitelist = {}
-local Blacklist = {}
-local PlayerInput = ""
-
-local WeaponProperties = {
-    ["AK47"] = {
-        Mode = "Auto",
-        MaxSpread = 47,
-        MaxRecoilPower = 3,
-        Distance = 3200,
-        BSpeed = 2500,
-        FireRate = 600
-    },
+local WeaponConfigs = {
     ["M40 Sniper"] = {
         Mode = "Bolt-Action",
         MaxSpread = 100,
@@ -54,8 +42,28 @@ local WeaponProperties = {
         Distance = 8000,
         BSpeed = 3000,
         FireRate = 60
+    },
+    ["AK47"] = {
+        Mode = "Auto",
+        MaxSpread = 47,
+        MaxRecoilPower = 3,
+        Distance = 3200,
+        BSpeed = 2500,
+        FireRate = 600
     }
 }
+
+local function getWeaponConfig(weaponName)
+    return WeaponConfigs[weaponName]
+end
+
+local Whitelist = {}
+local Blacklist = {}
+local PlayerInput = ""
+
+local function generateRandomColor()
+    return Color3.new(math.random(), math.random(), math.random())
+end
 
 local function setCameraToScalable()
     local localPlayer = Players.LocalPlayer
@@ -154,11 +162,9 @@ local function findNearestPlayer()
                 continue
             end
             
-           
             if #Whitelist > 0 and not isPlayerInList(player, Whitelist) then
                 continue
             end
-            
             
             if FilterRespawnAura and hasRespawnAura(player) then
                 continue
@@ -184,19 +190,7 @@ end
 local function getCurrentTool()
     local localPlayer = Players.LocalPlayer
     if not localPlayer.Character then return nil end
-    
-    local ak47 = localPlayer.Character:FindFirstChild("AK47")
-    if ak47 then return ak47 end
-    
-    local m40 = localPlayer.Character:FindFirstChild("M40 Sniper")
-    if m40 then return m40 end
-    
-    return nil
-end
-
-local function getWeaponProperties(weapon)
-    if not weapon then return nil end
-    return WeaponProperties[weapon.Name]
+    return localPlayer.Character:FindFirstChildOfClass("Tool")
 end
 
 local function createBeam(startPos, endPos)
@@ -226,7 +220,7 @@ local function createBeam(startPos, endPos)
     
     local currentRayColor = RayColor
     if RandomRayColor then
-        currentRayColor = Color3.new(math.random(), math.random(), math.random())
+        currentRayColor = generateRandomColor()
     end
     
     beamEffect.Color = ColorSequence.new(currentRayColor)
@@ -284,7 +278,7 @@ local function createShootArgs(targetPlayer, weapon)
     if not head then return nil end
     
     local targetPos = head.Position
-   
+    
     local playerPos
     local beamEndPos = targetPos
     
@@ -327,8 +321,7 @@ local function createShootArgs(targetPlayer, weapon)
     
     local direction = (targetPos - playerPos).Unit
     
-    local weaponProps = getWeaponProperties(weapon)
-    if not weaponProps then return nil end
+    local weaponConfig = getWeaponConfig(weapon.Name)
     
     local args = {
         [1] = weapon,
@@ -342,92 +335,48 @@ local function createShootArgs(targetPlayer, weapon)
             },
             [2] = {}
         },
-        [5] = Vector3.new(0, 1, 0),
-        [6] = weaponProps
+        [5] = Vector3.new(0, 1, 0)
     }
+    
+    if weaponConfig then
+        args[6] = {
+            ["Mode"] = weaponConfig.Mode,
+            ["MaxSpread"] = weaponConfig.MaxSpread,
+            ["MaxRecoilPower"] = weaponConfig.MaxRecoilPower,
+            ["Distance"] = weaponConfig.Distance,
+            ["BSpeed"] = weaponConfig.BSpeed,
+            ["FireRate"] = weaponConfig.FireRate
+        }
+    end
     
     args[4][2] = args[4][1]
     
     return args, playerPos, beamEndPos
 end
 
-local function fireM40SniperEvent()
-    local localPlayer = Players.LocalPlayer
-    if not localPlayer or not localPlayer.Character then return end
-    
-    local weapon = localPlayer.Character:FindFirstChild("M40 Sniper")
-    if not weapon then return end
-    
-    local args = {
-        [1] = weapon,
-        [2] = workspace.Tycoon.Tycoons.Romeo.PurchasedObjects:FindFirstChild("Lower Walls 1st Floor").Collision,
-        [3] = Vector3.new(-1523.93310546875, 62.48175811767578, 3723.2392578125),
-        [4] = {
-            [1] = {
-                [1] = Vector3.new(-1530.91015625, 65.11923217773438, 3735.76171875),
-                [2] = Vector3.new(0.4786831736564636, -0.18095116317272186, -0.8591386079788208),
-                [3] = 8.12185001373291
-            },
-            [2] = {}
-        },
-        [5] = Vector3.new(-0.4226420819759369, 0, 0.9062966108322144),
-        [6] = {
-            ["Mode"] = "Bolt-Action",
-            ["MaxSpread"] = 100,
-            ["MaxRecoilPower"] = 1,
-            ["Distance"] = 8000,
-            ["BSpeed"] = 3000,
-            ["FireRate"] = 60
-        }
-    }
-    
-    args[4][2] = args[4][1]
-    
-    pcall(function()
-        ReplicatedStorage.BulletFireSystem.BulletHit:FireServer(unpack(args))
-    end)
-end
-
-local function fireM40SniperEvent2()
-    local localPlayer = Players.LocalPlayer
-    if not localPlayer or not localPlayer.Character then return end
-    
-    local weapon = localPlayer.Character:FindFirstChild("M40 Sniper")
-    if not weapon then return end
-    
-    local args = {
-        [1] = {
-            [1] = Vector3.new(0.4786939024925232, -0.18082180619239807, -0.8591597676277161)
-        },
-        [2] = weapon,
-        [3] = game:GetService("Players").LocalPlayer.Character:FindFirstChild("SM40 Sniper"),
-        [4] = Vector3.new(-1530.91015625, 65.11920928955078, 3735.76171875),
-        [5] = false
-    }
-    
-    pcall(function()
-        ReplicatedStorage.BulletFireSystem.FireGun:FireServer(unpack(args))
-    end)
-end
-
-local function fireGunEvent()
-    local localPlayer = Players.LocalPlayer
-    if not localPlayer or not localPlayer.Character then return end
-    
-    local weapon = getCurrentTool()
-    if not weapon then return end
-    
+local function fireGunEvent(weapon)
     if weapon.Name == "M40 Sniper" then
-        fireM40SniperEvent()
-        fireM40SniperEvent2() 
+        local args = {
+            [1] = {
+                [1] = Vector3.new(0.937096118927002, -0.1158415749669075, 0.32928964495658875)
+            },
+            [2] = weapon,
+            [3] = game:GetService("Players").LocalPlayer.Character:FindFirstChild("SM40 Sniper"),
+            [4] = Vector3.new(3099.2109375, 80.99809265136719, -1712.369140625),
+            [5] = false
+        }
+        
+        pcall(function()
+            ReplicatedStorage.BulletFireSystem.FireGun:FireServer(unpack(args))
+        end)
     else
         
         local args = {
             [1] = {
                 [1] = Vector3.new(-0.40720272064208984, -0.13815894722938538, 0.902827799320221)
             },
-            [2] = game:GetService("Players").LocalPlayer.Character.AK47,
-            [3] = game:GetService("Players").LocalPlayer.Character.SAK47,
+            [2] = weapon,
+            [3] = game:GetService("Players").LocalPlayer.Character:FindFirstChild("S" .. weapon.Name),
             [4] = Vector3.new(853.695068359375, 67.79114532470703, -4806.09423828125),
             [5] = false
         }
@@ -438,13 +387,7 @@ local function fireGunEvent()
     end
 end
 
-local function fireGunAnimEvent()
-    local localPlayer = Players.LocalPlayer
-    if not localPlayer or not localPlayer.Character then return end
-    
-    local weapon = getCurrentTool()
-    if not weapon then return end
-    
+local function fireGunAnimEvent(weapon)
     local args = {
         [1] = 0.1,
         [2] = {
@@ -506,8 +449,8 @@ local function shootAtNearestPlayer()
         return 
     end
     
-    fireGunEvent()
-    fireGunAnimEvent()
+    fireGunEvent(weapon)
+    fireGunAnimEvent(weapon)
     playShootSound()  
     
     local success, error = pcall(function()
@@ -539,7 +482,7 @@ local function stopRagebot()
 end
 
 local RagebotToggle = RagebotSection:Toggle({
-    Name = "Ragebot(ak47 m40)", 
+    Name = "Ragebot（ak m40。）", 
     Default = false, 
     Flag = "RagebotToggle",
     Callback = function(Value)
