@@ -32,10 +32,15 @@ local RayBrightness = 1
 local RayColor = Color3.new(0, 1, 1)
 local FilterRespawnAura = true 
 local RayFadeDuration = 2
+local RandomRayColor = false 
 
 local Whitelist = {}
 local Blacklist = {}
 local PlayerInput = ""
+
+local function generateRandomColor()
+    return Color3.new(math.random(), math.random(), math.random())
+end
 
 local function setCameraToScalable()
     local localPlayer = Players.LocalPlayer
@@ -69,7 +74,7 @@ local function hasRespawnAura(player)
     if not FilterRespawnAura then return false end
     
     if player and player.Character then
- 
+        
         local character = player.Character
         
         if character:FindFirstChildOfClass("ForceField") then
@@ -192,7 +197,12 @@ local function createBeam(startPos, endPos)
     beamEffect.Attachment0 = attachment0
     beamEffect.Attachment1 = attachment1
     
-    beamEffect.Color = ColorSequence.new(RayColor)
+    local currentRayColor = RayColor
+    if RandomRayColor then
+        currentRayColor = generateRandomColor()
+    end
+    
+    beamEffect.Color = ColorSequence.new(currentRayColor)
     beamEffect.Width0 = RaySize
     beamEffect.Width1 = RaySize
     beamEffect.Texture = "rbxassetid://7136858729"
@@ -476,7 +486,7 @@ local FilterAuraToggle = RagebotSection:Toggle({
     end
 })
 
-RagebotSection:Label("Player List System(测试版。", "Left")
+RagebotSection:Label("Player List System", "Left")
 
 local PlayerInputBox = RagebotSection:Textbox({
     Name = "Player Name",
@@ -488,24 +498,22 @@ local PlayerInputBox = RagebotSection:Textbox({
     end
 })
 
---懒得改名字。还有这个是给狗看的。
-
 RagebotSection:Button({
-    Name = "Add to blacklist",
+    Name = "Add to Whitelist",
     Callback = function()
         if PlayerInput ~= "" then
             table.insert(Whitelist, PlayerInput)
-            Library:Notification("Added " .. PlayerInput .. " to blacklist", 3, Color3.fromRGB(0, 255, 0))
+            Library:Notification("Added " .. PlayerInput .. " to whitelist", 3, Color3.fromRGB(0, 255, 0))
         end
     end
 })
 
 RagebotSection:Button({
-    Name = "Add to whitelist",
+    Name = "Add to Blacklist",
     Callback = function()
         if PlayerInput ~= "" then
             table.insert(Blacklist, PlayerInput)
-            Library:Notification("Added " .. PlayerInput .. " to whitelist", 3, Color3.fromRGB(255, 0, 0))
+            Library:Notification("Added " .. PlayerInput .. " to blacklist", 3, Color3.fromRGB(255, 0, 0))
         end
     end
 })
@@ -534,6 +542,15 @@ RaySettingsSection:Toggle({
     Flag = "EnableRay",
     Callback = function(Value)
         RayEnabled = Value
+    end
+})
+
+RaySettingsSection:Toggle({
+    Name = "Random Ray Color", 
+    Default = false, 
+    Flag = "RandomRayColor",
+    Callback = function(Value)
+        RandomRayColor = Value
     end
 })
 
