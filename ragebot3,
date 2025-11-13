@@ -50,9 +50,64 @@ local WeaponConfigs = {
         Distance = 3200,
         BSpeed = 2500,
         FireRate = 600
+    },
+    ["MP7"] = {
+        Mode = "Auto",
+        MaxSpread = 35,
+        MaxRecoilPower = 3,
+        Distance = 500,
+        BSpeed = 2000,
+        FireRate = 950
+    },
+    ["UMP45"] = {
+        Mode = "Auto",
+        MaxSpread = 35,
+        MaxRecoilPower = 3,
+        Distance = 3200,
+        BSpeed = 2000,
+        FireRate = 700
+    },
+    ["Remington MSR"] = {
+        Mode = "Bolt-Action",
+        MaxSpread = 47,
+        MaxRecoilPower = 3,
+        Distance = 3200,
+        BSpeed = 2500,
+        FireRate = 600
+    },
+    ["G3 Rifle"] = {
+        Mode = "Auto",
+        MaxSpread = 40,
+        MaxRecoilPower = 3.5,
+        Distance = 3200,
+        BSpeed = 2500,
+        FireRate = 550
+    },
+    ["Kar98K"] = {
+        Mode = "Bolt-Action",
+        MaxSpread = 100,
+        MaxRecoilPower = 3.5,
+        Distance = 8000,
+        BSpeed = 4000,
+        FireRate = 50
+    },
+    ["M110 Rifle"] = {
+        Mode = "Semi",
+        MaxSpread = 20,
+        MaxRecoilPower = 3.5,
+        Distance = 8000,
+        BSpeed = 2200,
+        FireRate = 500
+    },
+    ["CS5 Sniper"] = {
+        Mode = "Bolt-Action",
+        MaxSpread = 100,
+        MaxRecoilPower = 1,
+        Distance = 8000,
+        BSpeed = 2000,
+        FireRate = 70
     }
 }
-
 local function getWeaponConfig(weaponName)
     return WeaponConfigs[weaponName]
 end
@@ -482,7 +537,7 @@ local function stopRagebot()
 end
 
 local RagebotToggle = RagebotSection:Toggle({
-    Name = "Ragebot（ak m40。）", 
+    Name = "Ragebot", 
     Default = false, 
     Flag = "RagebotToggle",
     Callback = function(Value)
@@ -491,6 +546,13 @@ local RagebotToggle = RagebotSection:Toggle({
         else
             stopRagebot()
         end
+    end
+})
+
+local Button = RagebotSection:Button({  
+    Name = "ak,m40,mp7,ump45,RM,G3,98k,m110,CS5",    
+    Risky = false,   
+    Callback = function() 
     end
 })
 
@@ -542,38 +604,38 @@ local PlayerInputBox = RagebotSection:Textbox({
 })
 
 RagebotSection:Button({
-    Name = "Add to Whitelist",
+    Name = "Add Blacklist",
     Callback = function()
         if PlayerInput ~= "" then
             table.insert(Whitelist, PlayerInput)
-            Library:Notification("Added " .. PlayerInput .. " to whitelist", 3, Color3.fromRGB(0, 255, 0))
+            Library:Notification("Added " .. PlayerInput .. " to white", 3, Color3.fromRGB(0, 255, 0))
         end
     end
 })
 
 RagebotSection:Button({
-    Name = "Add to Blacklist",
+    Name = "Add Whitelist",
     Callback = function()
         if PlayerInput ~= "" then
             table.insert(Blacklist, PlayerInput)
-            Library:Notification("Added " .. PlayerInput .. " to blacklist", 3, Color3.fromRGB(255, 0, 0))
+            Library:Notification("Added " .. PlayerInput .. " to Blacklist", 3, Color3.fromRGB(255, 0, 0))
         end
-    end
-})
-
-RagebotSection:Button({
-    Name = "Clear Whitelist",
-    Callback = function()
-        Whitelist = {}
-        Library:Notification("Whitelist cleared", 3, Color3.fromRGB(0, 255, 0))
     end
 })
 
 RagebotSection:Button({
     Name = "Clear Blacklist",
     Callback = function()
+        Whitelist = {}
+        Library:Notification("Blacklist cleared", 3, Color3.fromRGB(0, 255, 0))
+    end
+})
+
+RagebotSection:Button({
+    Name = "Clear Whitelist",
+    Callback = function()
         Blacklist = {}
-        Library:Notification("Blacklist cleared", 3, Color3.fromRGB(255, 0, 0))
+        Library:Notification("Whitelist cleared", 3, Color3.fromRGB(255, 0, 0))
     end
 })
 
