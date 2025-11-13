@@ -69,11 +69,11 @@ local WeaponConfigs = {
     },
     ["Remington MSR"] = {
         Mode = "Bolt-Action",
-        MaxSpread = 47,
-        MaxRecoilPower = 3,
-        Distance = 3200,
-        BSpeed = 2500,
-        FireRate = 600
+        MaxSpread = 100,
+        MaxRecoilPower = 1,
+        Distance = 8000,
+        BSpeed = 3000,
+        FireRate = 60
     },
     ["G3 Rifle"] = {
         Mode = "Auto",
