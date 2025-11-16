@@ -33,6 +33,8 @@ local RayColor = Color3.new(0, 1, 1)
 local FilterRespawnAura = true 
 local RayFadeDuration = 2
 local RandomRayColor = false
+local enabled = false
+local animEnabled = false
 
 local WeaponConfigs = {
     ["M40 Sniper"] = {
@@ -108,8 +110,35 @@ local WeaponConfigs = {
         FireRate = 70
     }
 }
+
+local ALLOWED_WEAPONS = {
+    ["M40 Sniper"] = true,
+    ["AK47"] = true,
+    ["MP7"] = true,
+    ["UMP45"] = true,
+    ["Remington MSR"] = true,
+    ["G3 Rifle"] = true,
+    ["Kar98K"] = true,
+    ["M110 Rifle"] = true,
+    ["CS5 Sniper"] = true
+}
+
 local function getWeaponConfig(weaponName)
     return WeaponConfigs[weaponName]
+end
+
+local function getCurrentHeldWeapon()
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer or not localPlayer.Character then
+        return nil
+    end
+    
+    return localPlayer.Character:FindFirstChildOfClass("Tool")
+end
+
+local function isWeaponAllowed(weapon)
+    if not weapon then return false end
+    return ALLOWED_WEAPONS[weapon.Name] == true
 end
 
 local Whitelist = {}
@@ -480,14 +509,14 @@ end
 local function shootAtNearestPlayer()
     if not RagebotEnabled then return end
     
+    local weapon = getCurrentHeldWeapon()
+    if not weapon or not isWeaponAllowed(weapon) then
+        return
+    end
+    
     local localPlayer = Players.LocalPlayer
     if not localPlayer.Character then 
         return 
-    end
-    
-    local weapon = getCurrentTool()
-    if not weapon then
-        return
     end
     
     local targetPlayer, distance = findNearestPlayer()
@@ -536,6 +565,51 @@ local function stopRagebot()
     end
 end
 
+local function start()
+    enabled = true
+end
+
+local function stop()
+    enabled = false
+end
+
+local function animStart()
+    animEnabled = true
+    local player = game.Players.LocalPlayer
+    local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        local anim = Instance.new("Animation")
+        anim.AnimationId = "rbxassetid://68339819"
+        local track = humanoid:LoadAnimation(anim)
+        track:Play()
+        wait(0.9)
+        track:AdjustSpeed(0)  
+    end
+end
+
+local function animStop()
+    animEnabled = false
+    local player = game.Players.LocalPlayer
+    local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+            track:Stop()
+        end
+    end
+end
+
+local v1 = game.Players.LocalPlayer.Character
+local v2 = v1:WaitForChild("Torso"):WaitForChild("Neck")
+local v3 = game:GetService("ReplicatedStorage"):WaitForChild("ACS_Engine"):WaitForChild("Events"):WaitForChild("HeadRot")
+local v4 = CFrame.new(0, 0.5, 0) * CFrame.Angles(-math.pi / 2 - math.rad(35), 0, math.pi)
+
+game:GetService("RunService").RenderStepped:Connect(function()
+    if enabled then
+        v2.C1 = v4
+        v3:FireServer(v4)
+    end
+end)
+
 local RagebotToggle = RagebotSection:Toggle({
     Name = "Ragebot", 
     Default = false, 
@@ -546,13 +620,6 @@ local RagebotToggle = RagebotSection:Toggle({
         else
             stopRagebot()
         end
-    end
-})
-
-local Button = RagebotSection:Button({  
-    Name = "ak,m40,mp7,ump45,RM,G3,98k,m110,CS5",    
-    Risky = false,   
-    Callback = function() 
     end
 })
 
@@ -604,38 +671,38 @@ local PlayerInputBox = RagebotSection:Textbox({
 })
 
 RagebotSection:Button({
-    Name = "Add Blacklist",
+    Name = "Add to Whitelist",
     Callback = function()
         if PlayerInput ~= "" then
             table.insert(Whitelist, PlayerInput)
-            Library:Notification("Added " .. PlayerInput .. " to white", 3, Color3.fromRGB(0, 255, 0))
+            Library:Notification("Added " .. PlayerInput .. " to whitelist", 3, Color3.fromRGB(0, 255, 0))
         end
     end
 })
 
 RagebotSection:Button({
-    Name = "Add Whitelist",
+    Name = "Add to Blacklist",
     Callback = function()
         if PlayerInput ~= "" then
             table.insert(Blacklist, PlayerInput)
-            Library:Notification("Added " .. PlayerInput .. " to Blacklist", 3, Color3.fromRGB(255, 0, 0))
+            Library:Notification("Added " .. PlayerInput .. " to blacklist", 3, Color3.fromRGB(255, 0, 0))
         end
-    end
-})
-
-RagebotSection:Button({
-    Name = "Clear Blacklist",
-    Callback = function()
-        Whitelist = {}
-        Library:Notification("Blacklist cleared", 3, Color3.fromRGB(0, 255, 0))
     end
 })
 
 RagebotSection:Button({
     Name = "Clear Whitelist",
     Callback = function()
+        Whitelist = {}
+        Library:Notification("Whitelist cleared", 3, Color3.fromRGB(0, 255, 0))
+    end
+})
+
+RagebotSection:Button({
+    Name = "Clear Blacklist",
+    Callback = function()
         Blacklist = {}
-        Library:Notification("Whitelist cleared", 3, Color3.fromRGB(255, 0, 0))
+        Library:Notification("Blacklist cleared", 3, Color3.fromRGB(255, 0, 0))
     end
 })
 
@@ -727,6 +794,24 @@ local CameraToggle = MainSection:Toggle({
             startCameraMode()
         else
             stopCameraMode()
+        end
+    end
+})
+
+local FEToggle = MainSection:Toggle({
+    Name = "fe  head  ", 
+    Default = false, 
+    Flag = "FeHeadToggle",
+    Callback = function(Value)
+        if Value then
+            start()
+            spawn(function() 
+                wait(1)
+                animStart()
+            end)
+        else
+            stop()
+            animStop()
         end
     end
 })
