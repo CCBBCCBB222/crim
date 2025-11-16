@@ -1,3 +1,5 @@
+--免费脚本还开裂我说明你妈死了
+
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ATLASTEAM01/Libraries/refs/heads/main/Utopia/Library.lua"))()
 
 local Window = Library:Window({
