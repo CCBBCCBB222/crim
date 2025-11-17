@@ -1,4 +1,5 @@
---免费脚本还开裂我说明你妈死了
+--操你的逼
+
 
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ATLASTEAM01/Libraries/refs/heads/main/Utopia/Library.lua"))()
 
@@ -37,6 +38,9 @@ local RayFadeDuration = 2
 local RandomRayColor = false
 local enabled = false
 local animEnabled = false
+local OriginOffsetX = 0
+local OriginOffsetY = 0
+local OriginOffsetZ = 0
 
 local WeaponConfigs = {
     ["M40 Sniper"] = {
@@ -244,12 +248,12 @@ local function findNearestPlayer()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer and player.Character then
             
-            if #Blacklist > 0 and isPlayerInList(player, Blacklist) then
-                continue
+            if #Whitelist > 0 and isPlayerInList(player, Whitelist) then
+                continue  
             end
             
-            if #Whitelist > 0 and not isPlayerInList(player, Whitelist) then
-                continue
+            if #Blacklist > 0 and not isPlayerInList(player, Blacklist) then
+                continue  
             end
             
             if FilterRespawnAura and hasRespawnAura(player) then
@@ -405,6 +409,8 @@ local function createShootArgs(targetPlayer, weapon)
         beamEndPos = targetPos
     end
     
+    playerPos = playerPos + Vector3.new(OriginOffsetX, OriginOffsetY, OriginOffsetZ)
+    
     local direction = (targetPos - playerPos).Unit
     
     local weaponConfig = getWeaponConfig(weapon.Name)
@@ -415,7 +421,7 @@ local function createShootArgs(targetPlayer, weapon)
         [3] = targetPos,
         [4] = {
             [1] = {
-                [1] = playerPos,
+                [1] = playerPos,  
                 [2] = direction,
                 [3] = (targetPos - playerPos).Magnitude
             },
@@ -782,6 +788,34 @@ RaySettingsSection:Label("Ray Color", "Left"):Colorpicker({
     Default = Color3.fromRGB(0, 255, 255), 
     Callback = function(Value, Alpha)
         RayColor = Value
+    end
+})
+
+local wallbangSection = CombatTab:Section({Name = "wallbang++", Side = 2})
+
+wallbangSection:Slider({
+    Name = "X", 
+    Flag = "OriginOffsetX", 
+    Min = -50, 
+    Default = 0, 
+    Max = 50, 
+    Suffix = "studs", 
+    Decimals = 0.01, 
+    Callback = function(Value)
+        OriginOffsetX = Value
+    end
+})
+
+wallbangSection:Slider({
+    Name = "Y", 
+    Flag = "OriginOffsetY", 
+    Min = 0, 
+    Default = 0, 
+    Max = 100, 
+    Suffix = "studs", 
+    Decimals = 0.01, 
+    Callback = function(Value)
+        OriginOffsetY = Value
     end
 })
 
