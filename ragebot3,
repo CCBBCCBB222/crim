@@ -1,5 +1,4 @@
---操你的逼
-
+--loser
 
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ATLASTEAM01/Libraries/refs/heads/main/Utopia/Library.lua"))()
 
@@ -41,6 +40,10 @@ local animEnabled = false
 local OriginOffsetX = 0
 local OriginOffsetY = 0
 local OriginOffsetZ = 0
+local TargetOffsetX = 0
+local TargetOffsetY = 0
+local TargetOffsetZ = 0
+local ShootSoundId = "rbxassetid://5043539486"
 
 local WeaponConfigs = {
     ["M40 Sniper"] = {
@@ -411,6 +414,8 @@ local function createShootArgs(targetPlayer, weapon)
     
     playerPos = playerPos + Vector3.new(OriginOffsetX, OriginOffsetY, OriginOffsetZ)
     
+    targetPos = targetPos + Vector3.new(TargetOffsetX, TargetOffsetY, TargetOffsetZ)
+    
     local direction = (targetPos - playerPos).Unit
     
     local weaponConfig = getWeaponConfig(weapon.Name)
@@ -418,7 +423,7 @@ local function createShootArgs(targetPlayer, weapon)
     local args = {
         [1] = weapon,
         [2] = head,
-        [3] = targetPos,
+        [3] = targetPos,  
         [4] = {
             [1] = {
                 [1] = playerPos,  
@@ -505,7 +510,7 @@ end
 
 local function playShootSound()
     local sound = Instance.new("Sound")
-    sound.SoundId = "rbxassetid://5043539486"  
+    sound.SoundId = ShootSoundId
     sound.Volume = 0.5
     sound.Parent = Workspace
     sound:Play()
@@ -666,6 +671,16 @@ local FilterAuraToggle = RagebotSection:Toggle({
     end
 })
 
+local SoundInputBox = RagebotSection:Textbox({
+    Name = "Shoot Sound ID",
+    Flag = "ShootSoundId",
+    Default = "5043539486",
+    Placeholder = "Enter sound ID",
+    Callback = function(Value)
+        ShootSoundId = "rbxassetid://" .. Value
+    end
+})
+
 RagebotSection:Label("Player List System", "Left")
 
 local PlayerInputBox = RagebotSection:Textbox({
@@ -794,28 +809,28 @@ RaySettingsSection:Label("Ray Color", "Left"):Colorpicker({
 local wallbangSection = CombatTab:Section({Name = "wallbang++", Side = 2})
 
 wallbangSection:Slider({
-    Name = "X", 
-    Flag = "OriginOffsetX", 
-    Min = -50, 
+    Name = "Firing Position", 
+    Flag = "OriginOffsetY", 
+    Min = 0, 
     Default = 0, 
     Max = 50, 
     Suffix = "studs", 
     Decimals = 0.01, 
     Callback = function(Value)
-        OriginOffsetX = Value
+        OriginOffsetY = Value
     end
 })
 
 wallbangSection:Slider({
-    Name = "Y", 
-    Flag = "OriginOffsetY", 
+    Name = "Target", 
+    Flag = "TargetOffsetY", 
     Min = 0, 
     Default = 0, 
-    Max = 100, 
+    Max = 50, 
     Suffix = "studs", 
     Decimals = 0.01, 
     Callback = function(Value)
-        OriginOffsetY = Value
+        TargetOffsetY = Value
     end
 })
 
