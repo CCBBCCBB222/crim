@@ -1,5 +1,3 @@
---loser
-
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ATLASTEAM01/Libraries/refs/heads/main/Utopia/Library.lua"))()
 
 local Window = Library:Window({
@@ -44,6 +42,9 @@ local TargetOffsetX = 0
 local TargetOffsetY = 0
 local TargetOffsetZ = 0
 local ShootSoundId = "rbxassetid://5043539486"
+local RocketEnabled = false
+local RocketThread = nil
+local RocketInterval = 0.5
 
 local WeaponConfigs = {
     ["M40 Sniper"] = {
@@ -602,7 +603,7 @@ end
 
 local function animStop()
     animEnabled = false
-    local player = game.Players.LocalPlayer
+极速    local player = game.Players.LocalPlayer
     local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
     if humanoid then
         for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
@@ -616,12 +617,452 @@ local v2 = v1:WaitForChild("Torso"):WaitForChild("Neck")
 local v3 = game:GetService("ReplicatedStorage"):WaitForChild("ACS_Engine"):WaitForChild("Events"):WaitForChild("HeadRot")
 local v4 = CFrame.new(0, 0.5, 0) * CFrame.Angles(-math.pi / 2 - math.rad(35), 0, math.pi)
 
+local function onCharacterAdded(character)
+    if enabled then
+        wait(1) 
+        v1 = character
+        v2 = character:WaitForChild("Torso"):WaitForChild("Neck")
+        animStart() 
+        
+        wait(0.9)
+        game:GetService("RunService").RenderStepped:Connect(function()
+            if enabled then
+                v2.C1 = v4
+                v3:FireServer(v4)
+            end
+        end)
+    end
+end
+
+game.Players.LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+
 game:GetService("RunService").RenderStepped:Connect(function()
     if enabled then
         v2.C1 = v4
         v3:FireServer(v4)
     end
 end)
+
+local function hasRPGWeapon()
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer or not localPlayer.Character then return false end
+    
+    local weapon = localPlayer.Character:FindFirstChild("RPG")
+    if weapon then
+        return true, weapon
+    end
+    
+    for _, tool in pairs(localPlayer.Character:GetChildren()) do
+        if tool:IsA("Tool") and (tool.Name:lower():find("rpg") or tool.Name:lower():find("rocket") or tool.Name:lower():find("launcher")) then
+            return true, tool
+        end
+    end
+    
+    return false, nil
+end
+
+coroutine.wrap(function()
+    while true do
+        pcall(hasRPGWeapon)
+        wait(0.1)
+    end
+end)()
+
+local function findNearestShield4Part()
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer or not localPlayer.Character then return nil end
+    
+    local hasRPG, weapon = hasRPGWeapon()
+    if not hasRPG then
+        return nil
+    end
+    
+    local nearestShield = nil
+    local shortestDistance = math.huge
+    
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Part") and obj.Name:find("Shield4") then
+            local distance = (localPlayer.Character.HumanoidRootPart.Position - obj.Position).Magnitude
+            if distance < shortestDistance then
+                shortestDistance = distance
+                nearestShield = obj
+            end
+        end
+    end
+    
+    return nearestShield, weapon
+end
+
+local function fireRocketAtShield4()
+    local shield, weapon = findNearestShield4Part()
+    if not shield or not weapon then 
+        return 
+    end
+    
+    local localPlayer = Players.LocalPlayer
+    local playerName = localPlayer.Name
+    
+    local playerPos = localPlayer.Character.HumanoidRootPart.Position
+    local targetPos = shield.Position
+    
+    if RayStartMode == "Near Enemy" then
+        local randomOffset = Vector3.new(
+            (math.random() - 0.5) * 60,  
+            (math.random() - 0.5) * 60,  
+            (math.random() - 0.5) * 60   
+        )
+        playerPos = targetPos + randomOffset
+    elseif RayStartMode == "Random" then
+        local selfRandomOffset = Vector3.new(
+            (math.random() - 0.5) * 30,  
+            (math.random() - 0.5) * 30,  
+            (math.random() - 0.5) * 30   
+        )
+        playerPos = playerPos + selfRandomOffset
+    end
+    
+    if RayEnabled then
+        createBeam(playerPos, targetPos)
+    end
+    
+    local fireArgs = {
+        [1] = Vector3.new(-0.5548986196517944, -0.7219788432121277, 0.41332095861434937),
+        [2] = weapon,
+        [3] = weapon,
+        [4] = Vector3.new(-3057.321533203125, 428.3932189941406, -1173.953369140625)
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.FireRocket:InvokeServer(unpack(fireArgs))
+    end)
+    
+    local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+    playShootSound()
+end
+
+local function startRocket()
+    
+    local hasRPG = hasRPGWeapon()
+    if not hasRPG then
+        RocketEnabled = false
+        return
+    end
+    
+    RocketEnabled = true
+    RocketThread = coroutine.wrap(function()
+        while RocketEnabled do
+            pcall(fireRocketAtShield4)
+            wait(RocketInterval)
+        end
+    end)()
+    RocketThread()
+end
+
+local function stopRocket()
+    RocketEnabled = false
+    if RocketThread then
+        coroutine.close(RocketThread)
+        RocketThread = nil
+    end
+end
 
 local RagebotToggle = RagebotSection:Toggle({
     Name = "Ragebot", 
@@ -659,6 +1100,32 @@ local DistanceSlider = RagebotSection:Slider({
     Decimals = 1, 
     Callback = function(Value)
         MaxLockDistance = Value
+    end
+})
+
+local RocketToggle = RagebotSection:Toggle({
+    Name = "Auto rpg shield", 
+    Default = false, 
+    Flag = "RocketToggle",
+    Callback = function(Value)
+        if Value then
+            startRocket()
+        else
+            stopRocket()
+        end
+    end
+})
+
+local RocketSpeedSlider = RagebotSection:Slider({
+    Name = "rpg/s", 
+    Flag = "RocketSpeed", 
+    Min = 0.01, 
+    Default = 0.5, 
+    Max = 5, 
+    Suffix = "s", 
+    Decimals = 0.01, 
+    Callback = function(Value)
+        RocketInterval = Value
     end
 })
 
