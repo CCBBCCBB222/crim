@@ -603,7 +603,7 @@ end
 
 local function animStop()
     animEnabled = false
-极速    local player = game.Players.LocalPlayer
+local player = game.Players.LocalPlayer
     local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
     if humanoid then
         for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
