@@ -1,0 +1,460 @@
+-- 基础服务引用
+local Players = game:GetService('Players')
+local LocalPlayer = Players.LocalPlayer
+local KickFunc = LocalPlayer.Kick
+local RobloxEnv = getrenv()
+
+-- ========== 反检测保护系统 ==========
+
+-- 钩住Kick函数，防止被游戏踢出
+hookfunction(KickFunc, newcclosure(function(self, reason)
+    -- 返回一个极长的等待时间，实际效果是阻止踢出
+    return task.wait(9e9)
+end))
+
+-- 钩住元方法，拦截所有名称调用
+local old
+old = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local Name = getnamecallmethod() -- 获取调用的方法名
+    
+    -- 如果检测到Kick调用，同样阻止
+    if Name == 'Kick' or Name == 'kick' then
+        return task.wait(9e9)
+    end
+    
+    -- 其他调用正常执行
+    return old(self, ...)
+end))
+
+-- 扫描垃圾回收器，查找反作弊函数并进行钩住
+local Detected, Kill
+for i, v in getgc(true) do
+    if typeof(v) ~= 'table' then continue end -- 只处理table类型
+
+    -- 查找反作弊系统的检测函数
+    local DetectFunc = rawget(v, "Detected")
+    local KillFunc = rawget(v, "Kill")
+
+    -- 钩住检测函数，让它总是返回true（欺骗反作弊系统）
+    if typeof(DetectFunc) == "function" and not Detected then
+        Detected = DetectFunc
+        hookfunction(DetectFunc, newcclosure(function()
+            return true -- 让反作弊系统认为一切正常
+        end))
+    end
+
+    -- 钩住终止函数，防止脚本被强制关闭
+    if rawget(v, "Variables") and rawget(v, "Process") and typeof(KillFunc) == "function" and not Kill then
+        Kill = KillFunc
+        hookfunction(KillFunc, newcclosure(function()
+            return true -- 阻止终止操作
+        end))
+    end
+end
+
+-- 钩住debug.info函数，干扰反作弊系统的调试检测
+local old
+old = hookfunction(RobloxEnv.debug.info, newcclosure(function(...)
+    local Func = ...
+    -- 如果检测到反作弊函数被调试，就挂起当前协程
+    if Func == Detected or Func == Kill then
+        return coroutine.yield(coroutine.running())
+    end
+    return old(...)
+end))
+
+-- ========== 游戏服务初始化 ==========
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- 游戏远程事件引用（用于模拟射击）
+local GNX_S = ReplicatedStorage:WaitForChild("Events"):WaitForChild("GNX_S")
+local ZFKLF_H = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ZFKLF_H")
+
+-- ========== UI界面库加载 ==========
+local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()  -- 主界面库
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()  -- 主题管理
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()  -- 配置保存
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+-- 界面基础设置
+Library.ShowToggleFrameInKeybinds = true  -- 在键位绑定中显示切换框架
+Library.ShowCustomCursor = true          -- 显示自定义光标
+Library.NotifySide = "Left"              -- 通知显示位置
+
+-- 创建主窗口
+local Window = Library:CreateWindow({
+    Title = 'ske.gg - Ragebot',  -- 窗口标题
+    Center = true,               -- 居中显示
+    AutoShow = true,             -- 自动显示
+    Resizable = true,            -- 可调整大小
+    ShowCustomCursor = true,
+    NotifySide = "Left",
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+-- ========== 界面标签页创建 ==========
+local Tabs = {
+    Ragebot = Window:AddTab('Ragebot'),        -- 自动瞄准设置页
+    ['UI Settings'] = Window:AddTab('UI Settings')  -- 界面设置页
+}
+
+-- 左侧设置组
+local RageLeft = Tabs.Ragebot:AddLeftGroupbox('Ragebot Settings')
+
+-- ========== 全局变量初始化 ==========
+getgenv().RageEnabled = false        -- 总开关
+getgenv().FireRate = 5               -- 射速（每秒发射次数）
+getgenv().Prediction = true          -- 是否开启预测
+getgenv().PredictionAmount = 0.1     -- 预测量
+getgenv().TracerColor = Color3.fromRGB(255, 0, 0)  -- 轨迹颜色
+getgenv().TracerWidth = 0.3          -- 轨迹宽度
+getgenv().TracerLifetime = 0.3       -- 轨迹存在时间
+getgenv().VisibilityCheck = true     -- 视线检测
+getgenv().LastShot = 0               -- 上次射击时间
+getgenv().TargetLock = false         -- 目标锁定
+getgenv().LockedTargets = {}         -- 锁定目标列表
+getgenv().Whitelist = {}             -- 白名单
+
+-- ========== 界面控件设置 ==========
+
+-- 总开关
+RageLeft:AddToggle('RageEnabled', {
+    Text = 'Enable Ragebot',
+    Default = false,
+    Callback = function(Value)
+        getgenv().RageEnabled = Value
+    end
+})
+
+-- 射速调节滑块
+RageLeft:AddSlider('FireRate', {
+    Text = 'FireRate (Higher = Faster)',
+    Default = 5,
+    Min = 1,
+    Max = 20,
+    Rounding = 0,
+    Callback = function(Value)
+        getgenv().FireRate = Value
+    end
+})
+
+-- 预测开关
+RageLeft:AddToggle('Prediction', {
+    Text = 'Prediction',
+    Default = true,
+    Callback = function(Value)
+        getgenv().Prediction = Value
+    end
+})
+
+-- 预测量调节
+RageLeft:AddSlider('PredictionAmount', {
+    Text = 'Prediction Amount',
+    Default = 0.1,
+    Min = 0.05,
+    Max = 0.3,
+    Rounding = 2,
+    Callback = function(Value)
+        getgenv().PredictionAmount = Value
+    end
+})
+
+-- 视线检测开关
+RageLeft:AddToggle('VisibilityCheck', {
+    Text = 'Visibility Check',
+    Default = true,
+    Callback = function(Value)
+        getgenv().VisibilityCheck = Value
+    end
+})
+
+-- 轨迹显示开关和颜色选择
+RageLeft:AddToggle('TracerEnabled', {
+    Text = 'Tracer',
+    Default = false,
+    Callback = function(Value)
+        getgenv().TracerEnabled = Value
+    end
+}):AddColorPicker('TracerColor', {
+    Default = Color3.fromRGB(255, 0, 0),
+    Callback = function(Value)
+        getgenv().TracerColor = Value
+    end
+})
+
+-- 目标锁定开关
+RageLeft:AddToggle('TargetLock', {
+    Text = 'Target Lock',
+    Default = false,
+    Callback = function(Value)
+        getgenv().TargetLock = Value
+        if not Value then
+            getgenv().LockedTargets = {}  -- 关闭时清空锁定列表
+        end
+    end
+})
+
+-- 轨迹宽度调节
+RageLeft:AddSlider('TracerWidth', {
+    Text = 'Tracer Width',
+    Default = 0.3,
+    Min = 0.1,
+    Max = 2,
+    Rounding = 1,
+    Callback = function(Value)
+        getgenv().TracerWidth = Value
+    end
+})
+
+-- 轨迹存在时间调节
+RageLeft:AddSlider('TracerLifetime', {
+    Text = 'Tracer Lifetime',
+    Default = 0.3,
+    Min = 0.1,
+    Max = 1,
+    Rounding = 1,
+    Callback = function(Value)
+        getgenv().TracerLifetime = Value
+    end
+})
+
+-- ========== 工具函数定义 ==========
+
+-- 生成随机字符串（用于模拟网络数据）
+function RandomString(length)
+    local charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    local result = ""
+    for i = 1, length do
+        result = result .. charset:sub(math.random(1, #charset), math.random(1, #charset))
+    end
+    return result
+end
+
+-- 播放命中音效
+function playHitSound()
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxassetid://6534948092"  -- 音效ID
+    sound.Volume = 1
+    sound.PlayOnRemove = true  -- 销毁时播放
+    sound.Parent = Camera
+    sound:Destroy()  -- 立即销毁触发播放
+end
+
+-- 视线检测函数（判断是否可以看见目标）
+function canSeeTarget(targetPart)
+    if not getgenv().VisibilityCheck then
+        return true  -- 如果关闭视线检测，直接返回可见
+    end
+
+    -- 创建射线检测参数
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}  -- 忽略自己的角色
+
+    local startPos = Camera.CFrame.Position  -- 射线起点（相机位置）
+    local endPos = targetPart.Position       -- 射线终点（目标位置）
+    local direction = (endPos - startPos)    -- 方向向量
+    local distance = direction.Magnitude     -- 距离
+
+    -- 执行射线检测
+    local raycastResult = workspace:Raycast(startPos, direction.Unit * distance, raycastParams)
+
+    if raycastResult then
+        local hitPart = raycastResult.Instance
+        if hitPart and hitPart.CanCollide then
+            local model = hitPart:FindFirstAncestorOfClass("Model")
+            if model then
+                local humanoid = model:FindFirstChild("Humanoid")
+                if humanoid then
+                    return true  -- 如果击中的是玩家模型，认为是可见的
+                end
+            end
+            return false  -- 击中了障碍物，不可见
+        end
+    end
+    return true  -- 没有击中任何物体，可见
+end
+
+-- 获取最近的可攻击玩家
+function getClosest()
+    local closest = nil     -- 最近的目标
+    local shortest = math.huge  -- 最短距离（初始设为极大值）
+
+    -- 遍历所有玩家
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then  -- 排除自己且角色存在
+            local h = p.Character:FindFirstChild("Humanoid")
+            local head = p.Character:FindFirstChild("Head")
+
+            -- 检查角色是否存活且有头部
+            if h and h.Health > 0 and head then
+                if getgenv().VisibilityCheck then
+                    -- 如果需要视线检测
+                    if canSeeTarget(head) then
+                        local dist = (head.Position - Camera.CFrame.Position).Magnitude
+                        if dist < shortest then
+                            shortest = dist
+                            closest = head
+                        end
+                    end
+                else
+                    -- 不需要视线检测，直接计算距离
+                    local dist = (head.Position - Camera.CFrame.Position).Magnitude
+                    if dist < shortest then
+                        shortest = dist
+                        closest = head
+                    end
+                end
+            end
+        end
+    end
+
+    return closest  -- 返回最近的目标头部
+end
+
+-- 获取当前手持的工具
+function getCurrentTool()
+    if LocalPlayer.Character then
+        for _, tool in pairs(LocalPlayer.Character:GetChildren()) do
+            if tool:IsA("Tool") then
+                return tool
+            end
+        end
+    end
+    return nil
+end
+
+-- 创建射击轨迹效果
+function createTracer(targetHead)
+    if not getgenv().TracerEnabled or not targetHead then
+        return  -- 轨迹功能未开启或没有目标时返回
+    end
+
+    -- 创建光束效果
+    local beam = Instance.new("Beam")
+    beam.Color = ColorSequence.new(getgenv().TracerColor)  -- 轨迹颜色
+    beam.Width0 = getgenv().TracerWidth  -- 起始宽度
+    beam.Width1 = getgenv().TracerWidth  -- 结束宽度
+    beam.Texture = "rbxassetid://7136858729"  -- 纹理ID
+    beam.TextureSpeed = 2    -- 纹理流动速度
+    beam.Brightness = 5      -- 亮度
+    beam.LightEmission = 1   -- 光发射
+    beam.FaceCamera = true   -- 始终面向相机
+
+    -- 创建两个附着点（起点和终点）
+    local a0 = Instance.new("Attachment")
+    local a1 = Instance.new("Attachment")
+
+    -- 设置起点位置（玩家角色或相机位置）
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        a0.WorldPosition = LocalPlayer.Character.HumanoidRootPart.Position
+    else
+        a0.WorldPosition = Camera.CFrame.Position
+    end
+
+    -- 设置终点位置（目标头部）
+    a1.WorldPosition = targetHead.Position
+
+    -- 连接附着点和光束
+    beam.Attachment0 = a0
+    beam.Attachment1 = a1
+    beam.Parent = Workspace
+    a0.Parent = Workspace
+    a1.Parent = Workspace
+
+    -- 定时销毁轨迹效果
+    delay(getgenv().TracerLifetime, function()
+        beam:Destroy()
+        a0:Destroy()
+        a1:Destroy()
+    end)
+end
+
+-- 核心射击函数
+function shoot(head)
+    local tool = getCurrentTool()
+    if not tool then
+        return  -- 没有工具时返回
+    end
+
+    -- 查找工具的必要组件
+    local values = tool:FindFirstChild("Values")
+    local hitMarker = tool:FindFirstChild("Hitmarker")
+    if not values or not hitMarker then
+        return
+    end
+
+    -- 检查弹药
+    local ammo = values:FindFirstChild("SERVER_Ammo")
+    local storedAmmo = values:FindFirstChild("SERVER_StoredAmmo")
+    if not ammo or not storedAmmo or ammo.Value <= 0 then
+        return  -- 没有弹药时返回
+    end
+
+    -- 计算命中位置和方向
+    local hitPosition = head.Position
+    local hitDirection = (hitPosition - Camera.CFrame.Position).Unit
+
+    -- 如果开启预测，根据目标速度调整命中位置
+    if getgenv().Prediction then
+        local velocity = head.Velocity or Vector3.zero
+        hitPosition = hitPosition + velocity * getgenv().PredictionAmount
+        hitDirection = (hitPosition - Camera.CFrame.Position).Unit
+    end
+
+    -- 生成随机密钥（模拟合法网络数据）
+    local randomKey = RandomString(30) .. "0"
+    
+    -- 构造远程事件参数
+    local args1 = {tick(), randomKey, tool, "FDS9I83", shootPosition, {hitDirection}, false}
+    local args2 = {"🧈🧈", tick(), tool, randomKey, 1, head, hitPosition, hitDirection, 19052023.49}
+
+    -- 触发远程事件（模拟射击动作）
+    GNX_S:FireServer(unpack(args1))
+    ZFKLF_H:FireServer(unpack(args2))
+
+    -- 更新弹药数量
+    ammo.Value = math.max(ammo.Value - 1, 0)
+    hitMarker:Fire(head)  -- 触发命中标记
+    storedAmmo.Value = storedAmmo.Value  -- 保持存储弹药不变
+
+    -- 创建轨迹和音效
+    createTracer(head)
+    playHitSound()
+end
+
+-- ========== 主循环 ==========
+task.spawn(function()
+    while true do
+        -- 根据射速计算等待时间
+        local waitTime = 1 / getgenv().FireRate
+        task.wait(waitTime)
+
+        -- 检查是否启用自动瞄准且达到射击间隔
+        if getgenv().RageEnabled and tick() - getgenv().LastShot >= waitTime then
+            createTracer(head)  -- 创建轨迹（这里head变量可能有问题）
+            local target = getClosest()  -- 获取最近目标
+            
+            if target then
+                shoot(head)  -- 射击目标（这里head变量可能有问题）
+                getgenv().LastShot = tick()  -- 更新最后射击时间
+            end
+        end
+    end
+end)
+
+-- ========== 界面主题和配置管理 ==========
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({'MenuKeybind'})
+SaveManager:BuildConfigSection(Tabs['UI Settings'])  -- 在UI设置页添加配置管理
+ThemeManager:ApplyToTab(Tabs['UI Settings'])        -- 应用主题设置
+SaveManager:LoadAutoloadConfig()                    -- 加载自动保存的配置
