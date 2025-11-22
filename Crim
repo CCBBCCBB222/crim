@@ -414,7 +414,7 @@ function shoot(head)
     
     -- 构造远程事件参数
     local args1 = {tick(), randomKey, tool, "FDS9I83", shootPosition, {hitDirection}, false}
-    local args2 = {"🧈🧈", tick(), tool, randomKey, 1, head, hitPosition, hitDirection, 19052023.49}
+    local args2 = {"🍯🍯", tick(), tool, randomKey, 1, head, hitPosition, hitDirection, 19052023.49}
 
     -- 触发远程事件（模拟射击动作）
     GNX_S:FireServer(unpack(args1))
