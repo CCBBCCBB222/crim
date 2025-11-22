@@ -1,0 +1,1372 @@
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ATLASTEAM01/Libraries/refs/heads/main/Utopia/Library.lua"))()
+
+local Window = Library:Window({
+    Name = "CC AS",
+    GradientTitle = {
+        Enabled = true,
+        Start = Color3.fromRGB(255, 255, 255),
+        Middle = Color3.fromRGB(0, 251, 255),
+        End = Color3.fromRGB(50, 135, 168),
+        Speed = 1
+    }
+})
+
+local CombatTab = Window:Page({Name = "ragebot", Columns = 2})
+local MainTab = Window:Page({Name = "Main", Columns = 1})
+local RagebotSection = CombatTab:Section({Name = "ragebot", Side = 1})
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local RagebotEnabled = false
+local RagebotThread = nil
+local RagebotInterval = 0.5
+local RayStartMode = "Player Body" 
+local MaxLockDistance = 500
+local CameraModeEnabled = false
+local CameraModeThread = nil
+local RayEnabled = true
+local RaySize = 0.5
+local RayBrightness = 1
+local RayColor = Color3.new(0, 1, 1)
+local FilterRespawnAura = true 
+local RayFadeDuration = 2
+local RandomRayColor = false
+local enabled = false
+local animEnabled = false
+local OriginOffsetX = 0
+local OriginOffsetY = 0
+local OriginOffsetZ = 0
+local TargetOffsetX = 0
+local TargetOffsetY = 0
+local TargetOffsetZ = 0
+local ShootSoundId = "rbxassetid://5043539486"
+local RocketEnabled = false
+local RocketThread = nil
+local RocketInterval = 0.5
+local FDMGBlockEnabled = true
+local originalFDMGEvent = nil
+
+local WeaponConfigs = {
+    ["M40 Sniper"] = {
+        Mode = "Bolt-Action",
+        MaxSpread = 100,
+        MaxRecoilPower = 1,
+        Distance = 8000,
+        BSpeed = 3000,
+        FireRate = 60
+    },
+    ["AK47"] = {
+        Mode = "Auto",
+        MaxSpread = 47,
+        MaxRecoilPower = 3,
+        Distance = 3200,
+        BSpeed = 2500,
+        FireRate = 600
+    },
+    ["MP7"] = {
+        Mode = "Auto",
+        MaxSpread = 35,
+        MaxRecoilPower = 3,
+        Distance = 500,
+        BSpeed = 2000,
+        FireRate = 950
+    },
+    ["UMP45"] = {
+        Mode = "Auto",
+        MaxSpread = 35,
+        MaxRecoilPower = 3,
+        Distance = 3200,
+        BSpeed = 2000,
+        FireRate = 700
+    },
+    ["Remington MSR"] = {
+        Mode = "Bolt-Action",
+        MaxSpread = 100,
+        MaxRecoilPower = 1,
+        Distance = 8000,
+        BSpeed = 3000,
+        FireRate = 60
+    },
+    ["G3 Rifle"] = {
+        Mode = "Auto",
+        MaxSpread = 40,
+        MaxRecoilPower = 3.5,
+        Distance = 3200,
+        BSpeed = 2500,
+        FireRate = 550
+    },
+    ["Kar98K"] = {
+        Mode = "Bolt-Action",
+        MaxSpread = 100,
+        MaxRecoilPower = 3.5,
+        Distance = 8000,
+        BSpeed = 4000,
+        FireRate = 50
+    },
+    ["M110 Rifle"] = {
+        Mode = "Semi",
+        MaxSpread = 20,
+        MaxRecoilPower = 3.5,
+        Distance = 8000,
+        BSpeed = 2200,
+        FireRate = 500
+    },
+    ["CS5 Sniper"] = {
+        Mode = "Bolt-Action",
+        MaxSpread = 100,
+        MaxRecoilPower = 1,
+        Distance = 8000,
+        BSpeed = 2000,
+        FireRate = 70
+    }
+}
+
+local ALLOWED_WEAPONS = {
+    ["M40 Sniper"] = true,
+    ["AK47"] = true,
+    ["MP7"] = true,
+    ["UMP45"] = true,
+    ["Remington MSR"] = true,
+    ["G3 Rifle"] = true,
+    ["Kar98K"] = true,
+    ["M110 Rifle"] = true,
+    ["CS5 Sniper"] = true
+}
+
+local function getWeaponConfig(weaponName)
+    return WeaponConfigs[weaponName]
+end
+
+local function getCurrentHeldWeapon()
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer or not localPlayer.Character then
+        return nil
+    end
+    
+    return localPlayer.Character:FindFirstChildOfClass("Tool")
+end
+
+local function isWeaponAllowed(weapon)
+    if not weapon then return false end
+    return ALLOWED_WEAPONS[weapon.Name] == true
+end
+
+local Whitelist = {}
+local Blacklist = {}
+local PlayerInput = ""
+
+local function generateRandomColor()
+    return Color3.new(math.random(), math.random(), math.random())
+end
+
+local function setCameraToScalable()
+    local localPlayer = Players.LocalPlayer
+    if localPlayer then
+        localPlayer.CameraMode = Enum.CameraMode.Classic
+    end
+end
+
+local function cameraModeLoop()
+    while CameraModeEnabled do
+        pcall(setCameraToScalable)
+        wait(0.1) 
+    end
+end
+
+local function startCameraMode()
+    CameraModeEnabled = true
+    CameraModeThread = coroutine.wrap(cameraModeLoop)()
+    CameraModeThread()
+end
+
+local function stopCameraMode()
+    CameraModeEnabled = false
+    if CameraModeThread then
+        coroutine.close(CameraModeThread)
+        CameraModeThread = nil
+    end
+end
+
+local function hasRespawnAura(player)
+    if not FilterRespawnAura then return false end
+    
+    if player and player.Character then
+        local character = player.Character
+        
+        if character:FindFirstChildOfClass("ForceField") then
+            return true
+        end
+        
+        local auraNames = {
+            "RespawnAura", "SpawnProtection", "Invincibility", 
+            "GodMode", "SpawnShield", "SpawnInvincibility",
+            "SpawnProtect", "RespawnShield", "RespawnProtection"
+        }
+        
+        for _, name in ipairs(auraNames) do
+            if character:FindFirstChild(name) then
+                return true
+            end
+        end
+        
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            if humanoid:GetAttribute("Invincible") or humanoid:GetAttribute("SpawnProtection") then
+                return true
+            end
+        end
+        
+        for _, child in ipairs(character:GetDescendants()) do
+            if child:IsA("ParticleEmitter") then
+                local name = child.Name:lower()
+                if name:find("spawn") or name:find("respawn") or name:find("aura") or name:find("shield") then
+                    return true
+                end
+            end
+        end
+    end
+    
+    return false
+end
+
+local function isPlayerInList(player, list)
+    if not player then return false end
+    
+    local playerName = player.Name:lower()
+    local displayName = player.DisplayName:lower()
+    
+    for _, name in ipairs(list) do
+        local listName = name:lower()
+        if playerName == listName or displayName == listName then
+            return true
+        end
+    end
+    
+    return false
+end
+
+local function findNearestPlayer()
+    local localPlayer = Players.LocalPlayer
+    local nearestPlayer, shortestDistance = nil, math.huge
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character then
+            
+            if #Whitelist > 0 and isPlayerInList(player, Whitelist) then
+                continue  
+            end
+            
+            if #Blacklist > 0 and not isPlayerInList(player, Blacklist) then
+                continue  
+            end
+            
+            if FilterRespawnAura and hasRespawnAura(player) then
+                continue
+            end
+            
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            local head = player.Character:FindFirstChild("Head")
+            
+            if humanoid and humanoid.Health > 0 and head then
+                local distance = (localPlayer.Character.HumanoidRootPart.Position - head.Position).Magnitude
+                
+                if distance < shortestDistance and distance <= MaxLockDistance then
+                    shortestDistance = distance
+                    nearestPlayer = player
+                end
+            end
+        end
+    end
+    
+    return nearestPlayer, shortestDistance
+end
+
+local function getCurrentTool()
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer.Character then return nil end
+    return localPlayer.Character:FindFirstChildOfClass("Tool")
+end
+
+local function createBeam(startPos, endPos)
+    if not RayEnabled then return nil end
+    
+    local distance = (startPos - endPos).Magnitude
+    
+    local beam = Instance.new("Part")
+    beam.Material = Enum.Material.Neon
+    beam.BrickColor = BrickColor.new("Cyan")
+    beam.Size = Vector3.new(RaySize, RaySize, distance)
+    beam.CFrame = CFrame.lookAt((startPos + endPos) / 2, endPos)
+    beam.Anchored = true
+    beam.CanCollide = false
+    beam.Transparency = 1.0
+    
+    local attachment0 = Instance.new("Attachment")
+    local attachment1 = Instance.new("Attachment")
+    attachment0.Position = Vector3.new(0, 0, -distance/2)
+    attachment1.Position = Vector3.new(0, 0, distance/2)
+    attachment0.Parent = beam
+    attachment1.Parent = beam
+    
+    local beamEffect = Instance.new("Beam")
+    beamEffect.Attachment0 = attachment0
+    beamEffect.Attachment1 = attachment1
+    
+    local currentRayColor = RayColor
+    if RandomRayColor then
+        currentRayColor = generateRandomColor()
+    end
+    
+    beamEffect.Color = ColorSequence.new(currentRayColor)
+    beamEffect.Width0 = RaySize
+    beamEffect.Width1 = RaySize
+    beamEffect.Texture = "rbxassetid://7136858729"
+    beamEffect.TextureLength = distance / 3
+    beamEffect.TextureSpeed = 1.5
+    beamEffect.LightEmission = RayBrightness
+    beamEffect.LightInfluence = 0
+    beamEffect.FaceCamera = true
+    beamEffect.Parent = beam
+    
+    beam.Parent = Workspace
+    
+    local fadeDuration = RayFadeDuration
+    local fadeSteps = 40
+    local fadeInterval = fadeDuration / fadeSteps
+    
+    coroutine.wrap(function()
+        for i = 1, fadeSteps do
+            if beam and beam.Parent then
+                local alpha = i / fadeSteps
+                local lightMultiplier = 1 - alpha
+                
+                beamEffect.Width0 = RaySize * lightMultiplier
+                beamEffect.Width1 = RaySize * lightMultiplier
+                beamEffect.LightEmission = RayBrightness * lightMultiplier
+                
+                beamEffect.Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, alpha * 0.5),
+                    NumberSequenceKeypoint.new(1, alpha * 0.8)
+                })
+                
+                wait(fadeInterval)
+            else
+                break
+            end
+        end
+        
+        if beam then beam:Destroy() end
+    end)()
+    
+    return beam
+end
+
+local function createShootArgs(targetPlayer, weapon)
+    if not targetPlayer or not targetPlayer.Character or not weapon then
+        return nil
+    end
+    
+    local localPlayer = Players.LocalPlayer
+    local head = targetPlayer.Character:FindFirstChild("Head")
+    
+    if not head then return nil end
+    
+    local targetPos = head.Position
+    
+    local playerPos
+    local beamEndPos = targetPos
+    
+    if RayStartMode == "Near Enemy" then
+        local randomOffset = Vector3.new(
+            (math.random() - 0.5) * 60,  
+            (math.random() - 0.5) * 60,  
+            (math.random() - 0.5) * 60   
+        )
+        playerPos = targetPos + randomOffset
+        
+        local targetRandomOffset = Vector3.new(
+            (math.random() - 0.5) * 20,  
+            (math.random() - 0.5) * 20,  
+            (math.random() - 0.5) * 20   
+        )
+        targetPos = targetPos + targetRandomOffset
+        
+        local direction = (targetPos - playerPos).Unit
+        beamEndPos = targetPos + (direction * 10)
+    elseif RayStartMode == "Random" then
+        local selfRandomOffset = Vector3.new(
+            (math.random() - 0.5) * 30,  
+            (math.random() - 0.5) * 30,  
+            (math.random() - 0.5) * 30   
+        )
+        playerPos = localPlayer.Character.HumanoidRootPart.Position + selfRandomOffset
+        
+        local targetRandomOffset = Vector3.new(
+            (math.random() - 0.5) * 10,  
+            (math.random() - 0.5) * 10,  
+            (math.random() - 0.5) * 10   
+        )
+        targetPos = targetPos + targetRandomOffset
+        beamEndPos = targetPos
+    else 
+        playerPos = localPlayer.Character.HumanoidRootPart.Position
+        beamEndPos = targetPos
+    end
+    
+    playerPos = playerPos + Vector3.new(OriginOffsetX, OriginOffsetY, OriginOffsetZ)
+    
+    targetPos = targetPos + Vector3.new(TargetOffsetX, TargetOffsetY, TargetOffsetZ)
+    
+    local direction = (targetPos - playerPos).Unit
+    
+    local weaponConfig = getWeaponConfig(weapon.Name)
+    
+    local args = {
+        [1] = weapon,
+        [2] = head,
+        [3] = targetPos,  
+        [4] = {
+            [1] = {
+                [1] = playerPos,  
+                [2] = direction,
+                [3] = (targetPos - playerPos).Magnitude
+            },
+            [2] = {}
+        },
+        [5] = Vector3.new(0, 1, 0)
+    }
+    
+    if weaponConfig then
+        args[6] = {
+            ["Mode"] = weaponConfig.Mode,
+            ["MaxSpread"] = weaponConfig.MaxSpread,
+            ["MaxRecoilPower"] = weaponConfig.MaxRecoilPower,
+            ["Distance"] = weaponConfig.Distance,
+            ["BSpeed"] = weaponConfig.BSpeed,
+            ["FireRate"] = weaponConfig.FireRate
+        }
+    end
+    
+    args[4][2] = args[4][1]
+    
+    return args, playerPos, beamEndPos
+end
+
+local function fireGunEvent(weapon)
+    if weapon.Name == "M40 Sniper" then
+        local args = {
+            [1] = {
+                [1] = Vector3.new(0.937096118927002, -0.1158415749669075, 0.32928964495658875)
+            },
+            [2] = weapon,
+            [3] = game:GetService("Players").LocalPlayer.Character:FindFirstChild("SM40 Sniper"),
+            [4] = Vector3.new(3099.2109375, 80.99809265136719, -1712.369140625),
+            [5] = false
+        }
+        
+        pcall(function()
+            ReplicatedStorage.BulletFireSystem.FireGun:FireServer(unpack(args))
+        end)
+    else
+        
+        local args = {
+            [1] = {
+                [1] = Vector3.new(-0.40720272064208984, -0.13815894722938538, 0.902827799320221)
+            },
+            [2] = weapon,
+            [3] = game:GetService("Players").LocalPlayer.Character:FindFirstChild("S" .. weapon.Name),
+            [4] = Vector3.new(853.695068359375, 67.79114532470703, -4806.09423828125),
+            [5] = false
+        }
+        
+        pcall(function()
+            ReplicatedStorage.BulletFireSystem.FireGun:FireServer(unpack(args))
+        end)
+    end
+end
+
+local function fireGunAnimEvent(weapon)
+    local args = {
+        [1] = 0.1,
+        [2] = {
+            ["LeftAim"] = CFrame.new(1.399999976158142, 0.25, -1.4500000476837158) * CFrame.Angles(-2.094395160675049, 0.6108652353286743, -0.4363323450088501),
+            ["ChamberAnim"] = function()end,
+            ["SprintAnim"] = function()end,
+            ["LeftSprint"] = CFrame.new(1.25, 1.149999976158142, -1.350000023841858) * CFrame.Angles(-1.0471975803375244, 0.6108652353286743, -0.4363323450088501),
+            ["ReloadAnim"] = function()end,
+            ["RightSprint"] = CFrame.new(-1, 0.5, -1.25) * CFrame.Angles(-1.0471975803375244, 0, -0),
+            ["IdleAnim"] = function()end,
+            ["EquipAnim"] = function()end,
+            ["ShootPos"] = CFrame.new(0, 0, 0.25) * CFrame.Angles(-0, 0, -0),
+            ["RightAim"] = CFrame.new(-0.574999988079071, 0.10000000149011612, -1) * CFrame.Angles(-1.5707963705062866, 0, 0),
+            ["ChamberBKAnim"] = function()end
+        },
+        [3] = weapon
+    }
+    
+    pcall(function()
+        ReplicatedStorage.ACS_Engine.Events.ServerGunAnim:FireServer(unpack(args))
+    end)
+end
+
+local function playShootSound()
+    local sound = Instance.new("Sound")
+    sound.SoundId = ShootSoundId
+    sound.Volume = 0.5
+    sound.Parent = Workspace
+    sound:Play()
+    
+    sound.Ended:Connect(function() sound:Destroy() end)
+    delay(10, function() if sound then sound:Destroy() end end)
+end
+
+local function shootAtNearestPlayer()
+    if not RagebotEnabled then return end
+    
+    local weapon = getCurrentHeldWeapon()
+    if not weapon or not isWeaponAllowed(weapon) then
+        return
+    end
+    
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer.Character then 
+        return 
+    end
+    
+    local targetPlayer, distance = findNearestPlayer()
+    if not targetPlayer then
+        return
+    end
+    
+    if distance > MaxLockDistance then
+        return
+    end
+    
+    local args, playerPos, beamEndPos = createShootArgs(targetPlayer, weapon)
+    if not args then 
+        return 
+    end
+    
+    fireGunEvent(weapon)
+    fireGunAnimEvent(weapon)
+    playShootSound()  
+    
+    local success, error = pcall(function()
+        ReplicatedStorage.BulletFireSystem.BulletHit:FireServer(unpack(args))
+    end)
+    
+    if success then
+        createBeam(playerPos, beamEndPos)
+        
+        local targetHumanoid = targetPlayer.Character:FindFirstChild("Humanoid")
+        local targetHealth = targetHumanoid and targetHumanoid.Health or 0
+        local weaponName = weapon.Name
+        
+        print(string.format("hit %s be %.1f in %.1f use %s", 
+            targetPlayer.Name, targetHealth, distance, weaponName))
+    end
+end
+
+local function startRagebot()
+    RagebotEnabled = true
+    RagebotThread = coroutine.wrap(function()
+        while RagebotEnabled do
+            pcall(shootAtNearestPlayer)
+            wait(RagebotInterval)  
+        end
+    end)()
+    RagebotThread()
+end
+
+local function stopRagebot()
+    RagebotEnabled = false
+    if RagebotThread then
+        coroutine.close(RagebotThread)
+        RagebotThread = nil
+    end
+end
+
+local function start()
+    enabled = true
+end
+
+local function stop()
+    enabled = false
+end
+
+local function animStart()
+    animEnabled = true
+    local player = game.Players.LocalPlayer
+    local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        local anim = Instance.new("Animation")
+        anim.AnimationId = "rbxassetid://68339819"
+        local track = humanoid:LoadAnimation(anim)
+        track:Play()
+        wait(0.9)
+        track:AdjustSpeed(0)  
+    end
+end
+
+local function animStop()
+    animEnabled = false
+local player = game.Players.LocalPlayer
+    local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+            track:Stop()
+        end
+    end
+end
+
+local v1 = game.Players.LocalPlayer.Character
+local v2 = v1:WaitForChild("Torso"):WaitForChild("Neck")
+local v3 = game:GetService("ReplicatedStorage"):WaitForChild("ACS_Engine"):WaitForChild("Events"):WaitForChild("HeadRot")
+local v4 = CFrame.new(0, 0.5, 0) * CFrame.Angles(-math.pi / 2 - math.rad(35), 0, math.pi)
+
+local function onCharacterAdded(character)
+    if enabled then
+        wait(1) 
+        v1 = character
+        v2 = character:WaitForChild("Torso"):WaitForChild("Neck")
+        animStart() 
+        
+        wait(0.9)
+        game:GetService("RunService").RenderStepped:Connect(function()
+            if enabled then
+                v2.C1 = v4
+                v3:FireServer(v4)
+            end
+        end)
+    end
+end
+
+game.Players.LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+
+game:GetService("RunService").RenderStepped:Connect(function()
+    if enabled then
+        v2.C1 = v4
+        v3:FireServer(v4)
+    end
+end)
+
+local function hasRPGWeapon()
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer or not localPlayer.Character then return false end
+    
+    local weapon = localPlayer.Character:FindFirstChild("RPG")
+    if weapon then
+        return true, weapon
+    end
+    
+    for _, tool in pairs(localPlayer.Character:GetChildren()) do
+        if tool:IsA("Tool") and (tool.Name:lower():find("rpg") or tool.Name:lower():find("rocket") or tool.Name:lower():find("launcher")) then
+            return true, tool
+        end
+    end
+    
+    return false, nil
+end
+
+coroutine.wrap(function()
+    while true do
+        pcall(hasRPGWeapon)
+        wait(0.1)
+    end
+end)()
+
+local function findNearestShield4Part()
+    local localPlayer = Players.LocalPlayer
+    if not localPlayer or not localPlayer.Character then return nil end
+    
+    local hasRPG, weapon = hasRPGWeapon()
+    if not hasRPG then
+        return nil
+    end
+    
+    local nearestShield = nil
+    local shortestDistance = math.huge
+    
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Part") and obj.Name:find("Shield4") then
+            local distance = (localPlayer.Character.HumanoidRootPart.Position - obj.Position).Magnitude
+            if distance < shortestDistance then
+                shortestDistance = distance
+                nearestShield = obj
+            end
+        end
+    end
+    
+    return nearestShield, weapon
+end
+
+local function fireRocketAtShield4()
+    local shield, weapon = findNearestShield4Part()
+    if not shield or not weapon then 
+        return 
+    end
+    
+    local localPlayer = Players.LocalPlayer
+    local playerName = localPlayer.Name
+    
+    local playerPos = localPlayer.Character.HumanoidRootPart.Position
+    local targetPos = shield.Position
+    
+    if RayStartMode == "Near Enemy" then
+        local randomOffset = Vector3.new(
+            (math.random() - 0.5) * 60,  
+            (math.random() - 0.5) * 60,  
+            (math.random() - 0.5) * 60   
+        )
+        playerPos = targetPos + randomOffset
+    elseif RayStartMode == "Random" then
+        local selfRandomOffset = Vector3.new(
+            (math.random() - 0.5) * 30,  
+            (math.random() - 0.5) * 30,  
+            (math.random() - 0.5) * 30   
+        )
+        playerPos = playerPos + selfRandomOffset
+    end
+    
+    if RayEnabled then
+        createBeam(playerPos, targetPos)
+    end
+    
+    local fireArgs = {
+        [1] = Vector3.new(-0.5548986196517944, -0.7219788432121277, 0.41332095861434937),
+        [2] = weapon,
+        [3] = weapon,
+        [4] = Vector3.new(-3057.321533203125, 428.3932189941406, -1173.953369140625)
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.FireRocket:InvokeServer(unpack(fireArgs))
+    end)
+    
+    local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+        local hitArgs = {
+        [1] = targetPos, 
+        [2] = Vector3.new(0.17362427711486816, 0, -0.9848119020462036),
+        [3] = weapon,
+        [4] = weapon,
+        [5] = shield,
+        [7] = playerName .. "Rocket4"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.RocketSystem.Events.RocketHit:FireServer(unpack(hitArgs))
+    end)
+    
+    playShootSound()
+end
+
+local function startRocket()
+    
+    local hasRPG = hasRPGWeapon()
+    if not hasRPG then
+        RocketEnabled = false
+        return
+    end
+    
+    RocketEnabled = true
+    RocketThread = coroutine.wrap(function()
+        while RocketEnabled do
+            pcall(fireRocketAtShield4)
+            wait(RocketInterval)
+        end
+    end)()
+    RocketThread()
+end
+
+local function stopRocket()
+    RocketEnabled = false
+    if RocketThread then
+        coroutine.close(RocketThread)
+        RocketThread = nil
+    end
+end
+
+local function blockFDMGEvent()
+    local replicatedStorage = game:GetService("ReplicatedStorage")
+    local fdmgEvent = replicatedStorage:WaitForChild("ACS_Engine"):WaitForChild("Events"):WaitForChild("FDMG")
+    
+    if FDMGBlockEnabled then
+    
+        originalFDMGEvent = fdmgEvent:Clone()
+        originalFDMGEvent.Parent = fdmgEvent.Parent
+        
+        if fdmgEvent:IsA("RemoteEvent") then
+            fdmgEvent:Destroy()
+        end
+    end
+end
+
+local RagebotToggle = RagebotSection:Toggle({
+    Name = "Ragebot", 
+    Default = false, 
+    Flag = "RagebotToggle",
+    Callback = function(Value)
+        if Value then
+            startRagebot()
+        else
+            stopRagebot()
+        end
+    end
+})
+
+local SpeedSlider = RagebotSection:Slider({
+    Name = "Ragebot/s", 
+    Flag = "RagebotSpeed", 
+    Min = 0.01, 
+    Default = 0.5, 
+    Max = 10, 
+    Suffix = "s", 
+    Decimals = 0.01, 
+    Callback = function(Value)
+        RagebotInterval = Value
+    end
+})
+
+local DistanceSlider = RagebotSection:Slider({
+    Name = "Distance", 
+    Flag = "LockDistance", 
+    Min = 0, 
+    Default = 500, 
+    Max = 8000, 
+    Suffix = "m", 
+    Decimals = 1, 
+    Callback = function(Value)
+        MaxLockDistance = Value
+    end
+})
+
+local RocketToggle = RagebotSection:Toggle({
+    Name = "Auto rpg shield", 
+    Default = false, 
+    Flag = "RocketToggle",
+    Callback = function(Value)
+        if Value then
+            startRocket()
+        else
+            stopRocket()
+        end
+    end
+})
+
+local RocketSpeedSlider = RagebotSection:Slider({
+    Name = "rpg/s", 
+    Flag = "RocketSpeed", 
+    Min = 0.01, 
+    Default = 0.5, 
+    Max = 5, 
+    Suffix = "s", 
+    Decimals = 0.01, 
+    Callback = function(Value)
+        RocketInterval = Value
+    end
+})
+
+local FilterAuraToggle = RagebotSection:Toggle({
+    Name = "Filter Respawn", 
+    Default = true, 
+    Flag = "FilterAuraToggle",
+    Callback = function(Value)
+        FilterRespawnAura = Value
+    end
+})
+
+local SoundInputBox = RagebotSection:Textbox({
+    Name = "Shoot Sound ID",
+    Flag = "ShootSoundId",
+    Default = "5043539486",
+    Placeholder = "Enter sound ID",
+    Callback = function(Value)
+        ShootSoundId = "rbxassetid://" .. Value
+    end
+})
+
+RagebotSection:Label("Player List System", "Left")
+
+local PlayerInputBox = RagebotSection:Textbox({
+    Name = "Player Name",
+    Flag = "PlayerInput",
+    Default = "",
+    Placeholder = "Enter player name",
+    Callback = function(Value)
+        PlayerInput = Value
+    end
+})
+
+RagebotSection:Button({
+    Name = "Add to Whitelist",
+    Callback = function()
+        if PlayerInput ~= "" then
+            table.insert(Whitelist, PlayerInput)
+            Library:Notification("Added " .. PlayerInput .. " to whitelist", 3, Color3.fromRGB(0, 255, 0))
+        end
+    end
+})
+
+RagebotSection:Button({
+    Name = "Add to Blacklist",
+    Callback = function()
+        if PlayerInput ~= "" then
+            table.insert(Blacklist, PlayerInput)
+            Library:Notification("Added " .. PlayerInput .. " to blacklist", 3, Color3.fromRGB(255, 0, 0))
+        end
+    end
+})
+
+RagebotSection:Button({
+    Name = "Clear Whitelist",
+    Callback = function()
+        Whitelist = {}
+        Library:Notification("Whitelist cleared", 3, Color3.fromRGB(0, 255, 0))
+    end
+})
+
+RagebotSection:Button({
+    Name = "Clear Blacklist",
+    Callback = function()
+        Blacklist = {}
+        Library:Notification("Blacklist cleared", 3, Color3.fromRGB(255, 0, 0))
+    end
+})
+
+local RaySettingsSection = CombatTab:Section({Name = "Ray Settings", Side = 2})
+
+RaySettingsSection:Toggle({
+    Name = "Enable Ray", 
+    Default = true, 
+    Flag = "EnableRay",
+    Callback = function(Value)
+        RayEnabled = Value
+    end
+})
+
+RaySettingsSection:Toggle({
+    Name = "Random Ray Color", 
+    Default = false, 
+    Flag = "RandomRayColor",
+    Callback = function(Value)
+        RandomRayColor = Value
+    end
+})
+
+RaySettingsSection:Dropdown({
+    Name = "Ray Start Point", 
+    Flag = "RayStartMode", 
+    Items = {"Player Body", "Near Enemy", "Random"}, 
+    Default = "Player Body",
+    Callback = function(Value)
+        RayStartMode = Value
+    end
+})
+
+RaySettingsSection:Slider({
+    Name = "Ray Size", 
+    Flag = "RaySize", 
+    Min = 0.1, 
+    Default = 0.5, 
+    Max = 5, 
+    Suffix = "units", 
+    Decimals = 0.01, 
+    Callback = function(Value)
+        RaySize = Value
+    end
+})
+
+RaySettingsSection:Slider({
+    Name = "Ray Brightness", 
+    Flag = "RayBrightness", 
+    Min = 0, 
+    Default = 1, 
+    Max = 2, 
+    Decimals = 0.01, 
+    Callback = function(Value)
+        RayBrightness = Value
+    end
+})
+
+RaySettingsSection:Slider({
+    Name = "Ray Fade Time", 
+    Flag = "RayFadeTime", 
+    Min = 0.1, 
+    Default = 2, 
+    Max = 10, 
+    Suffix = "s", 
+    Decimals = 0.1, 
+    Callback = function(Value)
+        RayFadeDuration = Value
+    end
+})
+
+RaySettingsSection:Label("Ray Color", "Left"):Colorpicker({ 
+    Name = "Ray Color", 
+    Flag = "RayColor", 
+    Default = Color3.fromRGB(0, 255, 255), 
+    Callback = function(Value, Alpha)
+        RayColor = Value
+    end
+})
+
+local wallbangSection = CombatTab:Section({Name = "wallbang++", Side = 2})
+
+wallbangSection:Slider({
+    Name = "Firing Position", 
+    Flag = "OriginOffsetY", 
+    Min = 0, 
+    Default = 0, 
+    Max = 50, 
+    Suffix = "studs", 
+    Decimals = 0.01, 
+    Callback = function(Value)
+        OriginOffsetY = Value
+    end
+})
+
+wallbangSection:Slider({
+    Name = "Target", 
+    Flag = "TargetOffsetY", 
+    Min = 0, 
+    Default = 0, 
+    Max = 50, 
+    Suffix = "studs", 
+    Decimals = 0.01, 
+    Callback = function(Value)
+        TargetOffsetY = Value
+    end
+})
+
+local MainSection = MainTab:Section({Name = "Playes", Side = 1})
+
+local CameraToggle = MainSection:Toggle({
+    Name = "Camera Mode ", 
+    Default = false, 
+    Flag = "CameraModeToggle",
+    Callback = function(Value)
+        if Value then
+            startCameraMode()
+        else
+            stopCameraMode()
+        end
+    end
+})
+
+local FEToggle = MainSection:Toggle({
+    Name = "fe  head  ", 
+    Default = false, 
+    Flag = "FeHeadToggle",
+    Callback = function(Value)
+        if Value then
+            start()
+            spawn(function() 
+                wait(1)
+                animStart()
+            end)
+        else
+            stop()
+            animStop()
+        end
+    end
+})
+
+local NoFallDamageToggle = MainSection:Toggle({
+    Name = "No Fall Damage ", 
+    Default = true, 
+    Flag = "NoFallDamage",
+    Callback = function(Value)
+        if Value then
+            blockFDMGEvent()
+        else
+            print("idk")
+        end
+    end
+})
