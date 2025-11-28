@@ -1,0 +1,846 @@
+local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+Library.ShowCustomCursor = true
+Library.NotifySide = "Left"
+
+local Window = Library:CreateWindow({
+    Title = 'CasCade。',
+    Center = true,
+    AutoShow = true,
+    Resizable = true,
+    ShowCustomCursor = true,
+    NotifySide = "Left",
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+local Tabs = {
+    Main = Window:AddTab('Main'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
+}
+
+local AutoShoot = {
+    Enabled = false,
+    Interval = 0.01,
+    LastShotTime = 0,
+    PredictionAmount = 0.15
+}
+
+local ReloadConfig = {
+    Enabled = false,
+    Interval = 0.1,
+    LastReloadTime = 0
+}
+
+local WallbangConfig = {
+    Enabled = true,
+    CheckWalls = true
+}
+
+local HealthFilterConfig = {
+    Enabled = false,
+    MinHealth = 3
+}
+
+local PlayerListConfig = {
+    Blacklist = {},
+    Whitelist = {},
+    InputName = ""   
+}
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+local events = ReplicatedStorage:WaitForChild("Events")
+local GNX_S = events:WaitForChild("GNX_S")
+local ZFKLF__H = events:WaitForChild("ZFKLF__H")
+local GNX_R = events:WaitForChild("GNX_R")  
+
+local RayConfig = {
+    RaySize = 1,
+    RayColor = Color3.fromRGB(0, 255, 255),
+    RayBrightness = 5,
+    RayDuration = 2,
+    FadeDuration = 0.5,
+    RandomRayColor = true,
+    RandomOffset = {
+        Enabled = true,         
+        StartMaxOffset = 15,
+        EndMaxOffset = 10
+    }
+}
+
+local function hasReviveAura(player)
+    if player and player.Character then
+        local humanoid = player.Character:FindFirstChild("Humanoid")
+        if humanoid then
+            for _, child in pairs(humanoid:GetChildren()) do
+                if child:IsA("BoolValue") and child.Name == "ReviveAura" and child.Value == true then
+                    return true
+                end
+            end
+        end
+        
+        for _, part in pairs(player.Character:GetChildren()) do
+            if part:IsA("Part") then
+                for _, child in pairs(part:GetChildren()) do
+                    if child:IsA("ParticleEmitter") and child.Name == "ReviveAura" then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function setupPlayerQuitMonitoring()
+    Players.PlayerRemoving:Connect(function(player)
+        local playerName = player.Name
+        local playerDisplayName = player.DisplayName
+        
+        for i, name in ipairs(PlayerListConfig.Blacklist) do
+            if name:lower() == playerName:lower() or name:lower() == playerDisplayName:lower() then
+                table.remove(PlayerListConfig.Blacklist, i)
+                Library:Notify(playerName .. " (黑名单) 已退出游戏", 5)
+                if blacklistLabel then
+                    blacklistLabel:SetText('Blacklist: ' .. #PlayerListConfig.Blacklist)
+                end
+                break
+            end
+        end
+        
+        for i, name in ipairs(PlayerListConfig.Whitelist) do
+            if name:lower() == playerName:lower() or name:lower() == playerDisplayName:lower() then
+                table.remove(PlayerListConfig.Whitelist, i)
+                Library:Notify(playerName .. " (白名单) 已退出游戏", 5)
+                if whitelistLabel then
+                    whitelistLabel:SetText('Whitelist: ' .. #PlayerListConfig.Whitelist)
+                end
+                break
+            end
+        end
+    end)
+end
+
+local function checkInputMatches()
+    if PlayerListConfig.InputName == "" then
+        return
+    end
+    
+    local inputText = PlayerListConfig.InputName:lower()
+    local foundMatches = {}
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local nameMatch = player.Name:lower():find(inputText)
+            local displayNameMatch = player.DisplayName:lower():find(inputText)
+            
+            if nameMatch or displayNameMatch then
+                table.insert(foundMatches, player)
+            end
+        end
+    end
+    
+    if #foundMatches > 0 then
+        for _, player in ipairs(foundMatches) do
+            Library:Notify("Matched player: " .. player.Name .. " (" .. player.DisplayName .. ")", 3)
+        end
+    end
+end
+
+local function isWallbangEnabled()
+    return WallbangConfig.Enabled
+end
+
+local function canWallbangHit(startPos, hitPosition)
+    if not isWallbangEnabled() or not WallbangConfig.CheckWalls then
+        return true
+    end
+    
+    if not startPos or not hitPosition then
+        return false
+    end
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    
+    local direction = (hitPosition - startPos).Unit
+    local distance = (hitPosition - startPos).Magnitude
+    
+    local currentPos = startPos
+    local remainingDistance = distance
+    local totalWallThickness = 0
+    local maxWalls = 3
+    local maxWallThickness = 1
+    
+    for i = 1, maxWalls do
+        local raycastResult = Workspace:Raycast(currentPos, direction * remainingDistance, raycastParams)
+        
+        if not raycastResult then
+            return true
+        end
+        
+        local hitPos = raycastResult.Position
+        local hitDistance = (hitPos - currentPos).Magnitude
+        
+        local wallThickness = 0
+        local thicknessRay = Workspace:Raycast(hitPos + direction * 0.1, direction * 10, raycastParams)
+        if thicknessRay then
+            wallThickness = (thicknessRay.Position - hitPos).Magnitude
+        end
+        
+        totalWallThickness = totalWallThickness + wallThickness
+        
+        if totalWallThickness > maxWallThickness then
+            return false
+        end
+        
+        local hitPart = raycastResult.Instance
+        local model = hitPart:FindFirstAncestorOfClass("Model")
+        
+        if model then
+            local humanoid = model:FindFirstChild("Humanoid")
+            if humanoid then
+                return true
+            end
+        end
+        
+        currentPos = hitPos + direction * (wallThickness + 0.1)
+        remainingDistance = distance - (currentPos - startPos).Magnitude
+        
+        if remainingDistance <= 0 then
+            return true
+        end
+    end
+    
+    return false
+end
+
+local function shouldIgnorePlayer(player)
+    if not HealthFilterConfig.Enabled then
+        return false
+    end
+    
+    if player == LocalPlayer then
+        return true
+    end
+    
+    if not player.Character then
+        return true
+    end
+    
+    local humanoid = player.Character:FindFirstChild("Humanoid")
+    if not humanoid then
+        return true
+    end
+    
+    if humanoid.Health <= HealthFilterConfig.MinHealth then
+        return true
+    end
+    
+    if hasReviveAura(player) then
+        return true
+    end
+    
+    return false
+end
+
+local function isPlayerInList(player, list, shouldNotify)
+    for _, playerName in ipairs(list) do
+        if player.Name:lower():find(playerName:lower()) or player.DisplayName:lower():find(playerName:lower()) then
+            if shouldNotify then
+                Library:Notify("Matched player: " .. player.Name .. " (" .. player.DisplayName .. ")", 3)
+            end
+            return true
+        end
+    end
+    return false
+end
+
+local function shouldTargetPlayer(player, shouldNotify)
+    if player == LocalPlayer then
+        return false
+    end
+    
+    if not player.Character then
+        return false
+    end
+    
+    local humanoid = player.Character:FindFirstChild("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then
+        return false
+    end
+    
+    if hasReviveAura(player) then
+        return false
+    end
+    
+    if #PlayerListConfig.Blacklist > 0 then
+        return isPlayerInList(player, PlayerListConfig.Blacklist, shouldNotify)
+    end
+    
+    if #PlayerListConfig.Whitelist > 0 then
+        return not isPlayerInList(player, PlayerListConfig.Whitelist, shouldNotify)
+    end
+    
+    return true
+end
+
+function RandomString(length)
+    local charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    local result = ""
+    for i = 1, length do
+        local rand = math.random(1, #charset)
+        result = result .. charset:sub(rand, rand)
+    end
+    return result
+end
+
+function generateRandomColor()
+    return Color3.new(math.random(), math.random(), math.random())
+end
+
+function generateRandomOffset(maxDistance)
+    local randomDirection = Vector3.new(
+        math.random() - 0.5,
+        math.random() - 0.5,
+        math.random() - 0.5
+    ).Unit
+    
+    local randomDistance = math.random() * maxDistance
+    return randomDirection * randomDistance
+end
+
+function createBeam(startPos, endPos)
+    local distance = (startPos - endPos).Magnitude
+    
+    local beam = Instance.new("Part")
+    beam.Material = Enum.Material.Neon
+    beam.BrickColor = BrickColor.new("Cyan")
+    beam.Size = Vector3.new(0.1, 0.1, distance)
+    beam.CFrame = CFrame.lookAt((startPos + endPos) / 2, endPos)
+    beam.Anchored = true
+    beam.CanCollide = false
+    beam.Transparency = 1
+    
+    local attachment0 = Instance.new("Attachment")
+    local attachment1 = Instance.new("Attachment")
+    attachment0.Position = Vector3.new(0, 0, -distance/2)
+    attachment1.Position = Vector3.new(0, 0, distance/2)
+    attachment0.Parent = beam
+    attachment1.Parent = beam
+    
+    local beamEffect = Instance.new("Beam")
+    beamEffect.Attachment0 = attachment0
+    beamEffect.Attachment1 = attachment1
+    
+    local currentRayColor = RayConfig.RayColor
+    if RayConfig.RandomRayColor then
+        currentRayColor = generateRandomColor()
+    end
+    
+    beamEffect.Color = ColorSequence.new(currentRayColor)
+    beamEffect.Width0 = RayConfig.RaySize
+    beamEffect.Width1 = RayConfig.RaySize
+    beamEffect.Texture = "rbxassetid://7136858729"
+    beamEffect.TextureLength = distance / 3
+    beamEffect.TextureSpeed = 1.5
+    beamEffect.LightEmission = RayConfig.RayBrightness
+    beamEffect.LightInfluence = 0
+    beamEffect.FaceCamera = true
+    beamEffect.Parent = beam
+    
+    beam.Parent = Workspace
+    
+    local fadeSteps = 20
+    local fadeInterval = RayConfig.FadeDuration / fadeSteps
+    
+    coroutine.wrap(function()
+        wait(RayConfig.RayDuration)
+        
+        for i = 1, fadeSteps do
+            if beam and beam.Parent then
+                local alpha = i / fadeSteps
+                local lightMultiplier = 1 - alpha
+                
+                beamEffect.Width0 = RayConfig.RaySize * lightMultiplier
+                beamEffect.Width1 = RayConfig.RaySize * lightMultiplier
+                beamEffect.LightEmission = RayConfig.RayBrightness * lightMultiplier
+                
+                beamEffect.Transparency = NumberSequence.new(alpha)
+                
+                wait(fadeInterval)
+            else
+                break
+            end
+        end
+        
+        if beam and beam.Parent then
+            beam:Destroy()
+        end
+    end)()
+    
+    return beam
+end
+
+function getCurrentWeapon()
+    if not LocalPlayer.Character then
+        return nil
+    end
+    
+    for _, item in pairs(LocalPlayer.Character:GetChildren()) do
+        if item:IsA("Tool") then
+            return item
+        end
+    end
+    
+    return nil
+end
+
+function getClosestEnemy()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if not shouldTargetPlayer(player, false) then
+            continue
+        end
+        
+        if shouldIgnorePlayer(player) then
+            continue
+        end
+        
+        if player.Character then
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            local head = player.Character:FindFirstChild("Head")
+            
+            if humanoid and humanoid.Health > 0 and head then
+                if isWallbangEnabled() and WallbangConfig.CheckWalls then
+                    local playerHead = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
+                    local startPos = playerHead and playerHead.Position or Camera.CFrame.Position
+                    
+                    local hitPosition = head.Position
+                    
+                    local targetVelocity = head.Velocity or Vector3.new(0, 0, 0)
+                    hitPosition = hitPosition + targetVelocity * AutoShoot.PredictionAmount
+                    
+                    local canHit = canWallbangHit(startPos, hitPosition)
+                    if not canHit then
+                        continue
+                    end
+                end
+                
+                local distance = (head.Position - Camera.CFrame.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestPlayer = {Head = head, Player = player}
+                end
+            end
+        end
+    end
+    
+    return closestPlayer
+end
+
+function updateAmmo(weapon, targetHead)
+    local values = weapon:FindFirstChild("Values")
+    local hitMarker = weapon:FindFirstChild("Hitmarker")
+    
+    if not values or not hitMarker then
+        return false
+    end
+    
+    local ammo = values:FindFirstChild("SERVER_Ammo")           
+    local storedAmmo = values:FindFirstChild("SERVER_StoredAmmo") 
+    
+    if not ammo or not storedAmmo or ammo.Value <= 0 then
+        return false
+    end
+    
+    storedAmmo.Value = storedAmmo.Value
+    ammo.Value = math.max(ammo.Value - 1, 0)
+    hitMarker:Fire(targetHead)
+    
+    return true
+end
+
+function createReloadEvent()
+    local tool = getCurrentWeapon()
+    if not tool then
+        return nil
+    end
+    
+    local args = {
+        1763919747.9947298,
+        "KLWE89U0",
+        tool
+    }
+    
+    return args
+end
+
+
+local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
+    if not isWallbangEnabled() or not WallbangConfig.CheckWalls then
+        return startPos, targetPos
+    end
+    
+    local bestStartPos = startPos
+    local bestTargetPos = targetPos
+    local minWallDistance = math.huge
+    
+    for i = 1, maxAttempts do
+        local angle = (i / maxAttempts) * 2 * math.pi
+        local radius = RayConfig.RandomOffset.StartMaxOffset
+        local testStartPos = startPos + Vector3.new(
+            math.cos(angle) * radius,
+            math.sin(angle) * radius * 0.5,
+            math.sin(angle) * radius
+        )
+        
+        local testTargetPos = targetPos + generateRandomOffset(RayConfig.RandomOffset.EndMaxOffset)
+        
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+        raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+        
+        local direction = (testTargetPos - testStartPos).Unit
+        local distance = (testTargetPos - testStartPos).Magnitude
+        
+        local raycastResult = Workspace:Raycast(testStartPos, direction * distance, raycastParams)
+        
+        if not raycastResult then
+            return testStartPos, testTargetPos
+        end
+        
+        local hitDistance = (raycastResult.Position - testStartPos).Magnitude
+        if hitDistance < minWallDistance then
+            minWallDistance = hitDistance
+            bestStartPos = testStartPos
+            bestTargetPos = testTargetPos
+        end
+    end
+    
+    return bestStartPos, bestTargetPos
+end
+
+function createAimshotEvent()
+    local targetData = getClosestEnemy()
+    if not targetData then
+        return nil, nil
+    end
+    
+    local targetHead = targetData.Head
+    local tool = getCurrentWeapon()
+    if not tool then
+        return nil, nil
+    end
+    
+    if not updateAmmo(tool, targetHead) then
+        return nil, nil
+    end
+    
+    local playerHead = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
+    local startPos = playerHead and playerHead.Position or Camera.CFrame.Position
+    
+    local hitPosition = targetHead.Position
+    
+    local targetVelocity = targetHead.Velocity or Vector3.new(0, 0, 0)
+    hitPosition = hitPosition + targetVelocity * AutoShoot.PredictionAmount
+    
+    local beamStartPos = startPos
+    local beamEndPos = hitPosition
+    
+    if RayConfig.RandomOffset.Enabled then
+        if isWallbangEnabled() and WallbangConfig.CheckWalls then
+            beamStartPos, beamEndPos = findOptimalShootingPosition(beamStartPos, beamEndPos, 850)
+            
+            local canHit = canWallbangHit(beamStartPos, beamEndPos)
+            if not canHit then
+                return nil, nil
+            end
+        else
+            beamStartPos = beamStartPos + generateRandomOffset(RayConfig.RandomOffset.StartMaxOffset)
+            beamEndPos = beamEndPos + generateRandomOffset(RayConfig.RandomOffset.EndMaxOffset)
+        end
+    end
+    
+    local hitDirection = (beamEndPos - beamStartPos).Unit
+    
+    createBeam(beamStartPos, beamEndPos)
+    
+    local randomKey = RandomString(30) .. "0"
+    
+    local args1 = {
+        tick(), 
+        randomKey, 
+        tool, 
+        "FDS9I83", 
+        beamStartPos,
+        {hitDirection}, 
+        false
+    }
+    
+    local args2 = {
+        "🧈", 
+        tool, 
+        randomKey, 
+        1, 
+        targetHead, 
+        beamEndPos,
+        hitDirection
+    }
+    
+    return args1, args2
+end
+
+
+local RagebotGroupBox = Tabs.Main:AddLeftGroupbox('Ragebot')
+
+RagebotGroupBox:AddToggle('RagebotToggle', {
+    Text = 'Ragebot',
+    Default = false,
+    Callback = function(Value)
+        AutoShoot.Enabled = Value
+    end
+})
+
+RagebotGroupBox:AddSlider('IntervalSlider', {
+    Text = 'ragebot/s',
+    Default = 0.01,
+    Min = 0.01,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(Value)
+        AutoShoot.Interval = Value
+    end
+})
+
+RagebotGroupBox:AddToggle('ReloadToggle', {
+    Text = 'Auto Reload (bugggg',
+    Default = false,
+    Callback = function(Value)
+        ReloadConfig.Enabled = Value
+    end
+})
+
+RagebotGroupBox:AddToggle('WallbangToggle', {
+    Text = 'Wallbang',
+    Default = true,
+    Callback = function(Value)
+        WallbangConfig.Enabled = Value
+    end
+})
+
+RagebotGroupBox:AddSlider('StartMaxOffsetSlider', {
+    Text = 'Start Max Offset',
+    Default = 15,
+    Min = 0,
+    Max = 50,
+    Rounding = 1,
+    Callback = function(Value)
+        RayConfig.RandomOffset.StartMaxOffset = Value
+    end
+})
+
+RagebotGroupBox:AddSlider('EndMaxOffsetSlider', {
+    Text = 'End Max Offset',
+    Default = 15,
+    Min = 0,
+    Max = 50,
+    Rounding = 1,
+    Callback = function(Value)
+        RayConfig.RandomOffset.EndMaxOffset = Value
+    end
+})
+
+RagebotGroupBox:AddToggle('WallCheckToggle', {
+    Text = 'WallCheck',
+    Default = true,
+    Callback = function(Value)
+        WallbangConfig.CheckWalls = Value
+    end
+})
+
+RagebotGroupBox:AddToggle('HealthFilterToggle', {
+    Text = 'Check Knocks',
+    Default = false,
+    Callback = function(Value)
+        HealthFilterConfig.Enabled = Value
+    end
+})
+
+RagebotGroupBox:AddSlider('PredictionSlider', {
+    Text = 'Prediction Amount',
+    Default = 0.15,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(Value)
+        AutoShoot.PredictionAmount = Value
+    end
+})
+
+local RaySettingsGroupBox = Tabs.Main:AddRightGroupbox('Ray Settings')
+
+RaySettingsGroupBox:AddSlider('RaySizeSlider', {
+    Text = 'Ray Size',
+    Default = 1,
+    Min = 0.1,
+    Max = 5,
+    Rounding = 1,
+    Callback = function(Value)
+        RayConfig.RaySize = Value
+    end
+})
+
+RaySettingsGroupBox:AddSlider('RayDurationSlider', {
+    Text = 'Ray Duration',
+    Default = 2,
+    Min = 0.1,
+    Max = 10,
+    Rounding = 1,
+    Callback = function(Value)
+        RayConfig.RayDuration = Value
+    end
+})
+
+local PlayerListGroupBox = Tabs.Main:AddRightGroupbox('Player List')
+
+local playerNameInput = PlayerListGroupBox:AddInput('PlayerNameInput', {
+    Text = 'Player Name',
+    Default = '',
+    Placeholder = 'Enter player name',
+    Callback = function(Value)
+        PlayerListConfig.InputName = Value
+        checkInputMatches()
+    end
+})
+
+PlayerListGroupBox:AddButton('Add to Blacklist', function()
+    if PlayerListConfig.InputName ~= "" then
+        table.insert(PlayerListConfig.Blacklist, PlayerListConfig.InputName)
+        Library:Notify("Added " .. PlayerListConfig.InputName .. " to blacklist", 3)
+        
+        if blacklistLabel then
+            blacklistLabel:SetText('Blacklist: ' .. #PlayerListConfig.Blacklist)
+        end
+    end
+end)
+
+PlayerListGroupBox:AddButton('Add to Whitelist', function()
+    if PlayerListConfig.InputName ~= "" then
+        table.insert(PlayerListConfig.Whitelist, PlayerListConfig.InputName)
+        Library:Notify("Added " .. PlayerListConfig.InputName .. " to whitelist", 3)
+        
+        if whitelistLabel then
+            whitelistLabel:SetText('Whitelist: ' .. #PlayerListConfig.Whitelist)
+        end
+    end
+end)
+
+PlayerListGroupBox:AddButton('Clear Blacklist', function()
+    PlayerListConfig.Blacklist = {}
+    Library:Notify("Blacklist cleared", 3)
+    
+    if blacklistLabel then
+        blacklistLabel:SetText('Blacklist: ' .. #PlayerListConfig.Blacklist)
+    end
+end)
+
+PlayerListGroupBox:AddButton('Clear Whitelist', function()
+    PlayerListConfig.Whitelist = {}
+    Library:Notify("Whitelist cleared", 3)
+    
+    if whitelistLabel then
+        whitelistLabel:SetText('Whitelist: ' .. #PlayerListConfig.Whitelist)
+    end
+end)
+
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+
+MenuGroup:AddButton('Unload', function()
+    Library:Unload()
+end)
+
+MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { 
+    Default = 'RightControl', 
+    NoUI = false, 
+    Text = 'Menu keybind' 
+})
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+
+ThemeManager:SetFolder('CCas')
+SaveManager:SetFolder('CCas')
+
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+
+setupPlayerQuitMonitoring()
+
+coroutine.wrap(function()
+    while true do
+        if AutoShoot.Enabled then
+            local currentTime = tick()
+            
+            if currentTime - AutoShoot.LastShotTime >= AutoShoot.Interval then
+                local args1, args2 = createAimshotEvent()
+                if args1 and args2 then
+                    coroutine.wrap(function()
+                        GNX_S:FireServer(unpack(args1))
+                        ZFKLF__H:FireServer(unpack(args2))
+                    end)()
+                    
+                    AutoShoot.LastShotTime = currentTime
+                end
+            end
+        end
+        
+        task.wait(0.01)
+    end
+end)()
+
+coroutine.wrap(function()
+    while true do
+        if ReloadConfig.Enabled then
+            local currentTime = tick()
+            
+            if currentTime - ReloadConfig.LastReloadTime >= ReloadConfig.Interval then
+                local args = createReloadEvent()
+                if args then
+                    coroutine.wrap(function()
+                        GNX_R:FireServer(unpack(args))
+                    end)()
+                    
+                    ReloadConfig.LastReloadTime = currentTime
+                end
+            end
+        end
+        
+        task.wait(0.01)
+    end
+end)()
+
+Library:OnUnload(function()
+    Library.Unloaded = true
+end)
+
+Library:Notify('CCas Loaded!', 5)
