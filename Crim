@@ -75,8 +75,8 @@ local RayConfig = {
     RandomRayColor = true,
     RandomOffset = {
         Enabled = true,         
-        StartMaxOffset = 15,
-        EndMaxOffset = 10
+        StartMaxOffset = 18.5,
+        EndMaxOffset = 23.2
     }
 }
 
@@ -483,7 +483,7 @@ function createReloadEvent()
     end
     
     local args = {
-        1763919747.9947298,
+        tick(),
         "KLWE89U0",
         tool
     }
@@ -491,26 +491,44 @@ function createReloadEvent()
     return args
 end
 
-
 local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
+    
     if not isWallbangEnabled() or not WallbangConfig.CheckWalls then
         return startPos, targetPos
     end
     
     local bestStartPos = startPos
     local bestTargetPos = targetPos
-    local minWallDistance = math.huge
+    local minWallDistance = math.huge  
     
     for i = 1, maxAttempts do
-        local angle = (i / maxAttempts) * 2 * math.pi
+        
+        local goldenRatio = (1 + math.sqrt(5)) / 2
+        local theta = 2 * math.pi * i / goldenRatio
+        local phi = math.acos(1 - 2 * (i + 0.5) / maxAttempts)
+        
+        local x = math.cos(theta) * math.sin(phi)
+        local y = math.sin(theta) * math.sin(phi)
+        local z = math.cos(phi)
+        
         local radius = RayConfig.RandomOffset.StartMaxOffset
+        
         local testStartPos = startPos + Vector3.new(
-            math.cos(angle) * radius,
-            math.sin(angle) * radius * 0.5,
-            math.sin(angle) * radius
+            x * radius,  
+            y * radius,  
+            z * radius   
         )
         
-        local testTargetPos = targetPos + generateRandomOffset(RayConfig.RandomOffset.EndMaxOffset)
+        local targetRadius = RayConfig.RandomOffset.EndMaxOffset
+        local targetX = math.cos(theta + math.pi) * math.sin(phi)  
+        local targetY = math.sin(theta + math.pi) * math.sin(phi)
+        local targetZ = math.cos(phi)
+        
+        local testTargetPos = targetPos + Vector3.new(
+            targetX * targetRadius, 
+            targetY * targetRadius,  
+            targetZ * targetRadius  
+        )
         
         local raycastParams = RaycastParams.new()
         raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
@@ -526,6 +544,7 @@ local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
         end
         
         local hitDistance = (raycastResult.Position - testStartPos).Magnitude
+        
         if hitDistance < minWallDistance then
             minWallDistance = hitDistance
             bestStartPos = testStartPos
@@ -646,7 +665,7 @@ RagebotGroupBox:AddToggle('WallbangToggle', {
 
 RagebotGroupBox:AddSlider('StartMaxOffsetSlider', {
     Text = 'Start Max Offset',
-    Default = 15,
+    Default = 18.5,
     Min = 0,
     Max = 50,
     Rounding = 1,
@@ -657,7 +676,7 @@ RagebotGroupBox:AddSlider('StartMaxOffsetSlider', {
 
 RagebotGroupBox:AddSlider('EndMaxOffsetSlider', {
     Text = 'End Max Offset',
-    Default = 15,
+    Default = 23.2,
     Min = 0,
     Max = 50,
     Rounding = 1,
