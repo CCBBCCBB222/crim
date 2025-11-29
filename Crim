@@ -499,9 +499,10 @@ local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
     local bestStartPos = startPos
     local bestTargetPos = targetPos
     local minWallDistance = math.huge  
+    local bestTargetDistance = math.huge  
     
     for i = 1, maxAttempts do
-       
+        
         local goldenRatio = (1 + math.sqrt(5)) / 2
         local theta = 2 * math.pi * i / goldenRatio
         local phi = math.acos(1 - 2 * (i + 0.5) / maxAttempts)
@@ -518,6 +519,10 @@ local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
             z * radius   
         )
         
+        local targetRadius = RayConfig.RandomOffset.EndMaxOffset
+        
+        local currentTargetRadius = targetRadius * (1 - (i-1) / maxAttempts)
+        
         local targetGoldenRatio = (1 + math.sqrt(5)) / 2
         local targetTheta = 2 * math.pi * (i + 0.5) / targetGoldenRatio  
         local targetPhi = math.acos(1 - 2 * (i + 0.5) / maxAttempts)
@@ -526,12 +531,10 @@ local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
         local targetY = math.sin(targetTheta) * math.sin(targetPhi)
         local targetZ = math.cos(targetPhi)
         
-        local targetRadius = RayConfig.RandomOffset.EndMaxOffset
-        
         local testTargetPos = targetPos + Vector3.new(
-            targetX * targetRadius, 
-            targetY * targetRadius,  
-            targetZ * targetRadius  
+            targetX * currentTargetRadius, 
+            targetY * currentTargetRadius,  
+            targetZ * currentTargetRadius  
         )
         
         local raycastParams = RaycastParams.new()
@@ -544,21 +547,34 @@ local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
         local raycastResult = Workspace:Raycast(testStartPos, direction * distance, raycastParams)
         
         if not raycastResult then
-            return testStartPos, testTargetPos
-        end
-        
-        local hitDistance = (raycastResult.Position - testStartPos).Magnitude
-        
-        if hitDistance < minWallDistance then
-            minWallDistance = hitDistance
-            bestStartPos = testStartPos
-            bestTargetPos = testTargetPos
+            
+            local targetDistance = (testTargetPos - targetPos).Magnitude
+            
+            if targetDistance < bestTargetDistance then
+                bestTargetDistance = targetDistance
+                bestStartPos = testStartPos
+                bestTargetPos = testTargetPos
+                
+                if targetDistance < 0.5 then
+                    return bestStartPos, bestTargetPos
+                end
+            end
+        else
+            local hitDistance = (raycastResult.Position - testStartPos).Magnitude
+            
+            local targetDistance = (testTargetPos - targetPos).Magnitude
+            
+            if hitDistance < minWallDistance or (hitDistance == minWallDistance and targetDistance < bestTargetDistance) then
+                minWallDistance = hitDistance
+                bestTargetDistance = targetDistance
+                bestStartPos = testStartPos
+                bestTargetPos = testTargetPos
+            end
         end
     end
     
     return bestStartPos, bestTargetPos
 end
-
 
 function createAimshotEvent()
     local targetData = getClosestEnemy()
@@ -718,6 +734,14 @@ RagebotGroupBox:AddSlider('PredictionSlider', {
 })
 
 local RaySettingsGroupBox = Tabs.Main:AddRightGroupbox('Ray Settings')
+
+RaySettingsGroupBox:AddToggle('colorToggle', {
+    Text = 'RandomRayColor',
+    Default = true,
+    Callback = function(Value)
+        RayConfig.RandomRayColor = Value
+    end
+})
 
 RaySettingsGroupBox:AddSlider('RaySizeSlider', {
     Text = 'Ray Size',
