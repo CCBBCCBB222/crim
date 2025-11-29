@@ -492,7 +492,6 @@ function createReloadEvent()
 end
 
 local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
-    
     if not isWallbangEnabled() or not WallbangConfig.CheckWalls then
         return startPos, targetPos
     end
@@ -502,7 +501,7 @@ local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
     local minWallDistance = math.huge  
     
     for i = 1, maxAttempts do
-        
+       
         local goldenRatio = (1 + math.sqrt(5)) / 2
         local theta = 2 * math.pi * i / goldenRatio
         local phi = math.acos(1 - 2 * (i + 0.5) / maxAttempts)
@@ -519,10 +518,15 @@ local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
             z * radius   
         )
         
+        local targetGoldenRatio = (1 + math.sqrt(5)) / 2
+        local targetTheta = 2 * math.pi * (i + 0.5) / targetGoldenRatio  
+        local targetPhi = math.acos(1 - 2 * (i + 0.5) / maxAttempts)
+        
+        local targetX = math.cos(targetTheta) * math.sin(targetPhi)
+        local targetY = math.sin(targetTheta) * math.sin(targetPhi)
+        local targetZ = math.cos(targetPhi)
+        
         local targetRadius = RayConfig.RandomOffset.EndMaxOffset
-        local targetX = math.cos(theta + math.pi) * math.sin(phi)  
-        local targetY = math.sin(theta + math.pi) * math.sin(phi)
-        local targetZ = math.cos(phi)
         
         local testTargetPos = targetPos + Vector3.new(
             targetX * targetRadius, 
@@ -554,6 +558,7 @@ local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
     
     return bestStartPos, bestTargetPos
 end
+
 
 function createAimshotEvent()
     local targetData = getClosestEnemy()
@@ -861,5 +866,3 @@ end)()
 Library:OnUnload(function()
     Library.Unloaded = true
 end)
-
-Library:Notify('CCas Loaded!', 5)
