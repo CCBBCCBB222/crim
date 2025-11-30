@@ -182,7 +182,7 @@ local function canWallbangHit(startPos, hitPosition)
     local currentPos = startPos
     local remainingDistance = distance
     local totalWallThickness = 0
-    local maxWalls = 3
+    local maxWalls = 5
     local maxWallThickness = 1
 
     for i = 1, maxWalls do
@@ -591,15 +591,26 @@ function createAimshotEvent()
 
     if RayConfig.RandomOffset.Enabled then
         if isWallbangEnabled() and WallbangConfig.CheckWalls then
+            
             beamStartPos, beamEndPos = findOptimalShootingPosition(beamStartPos, beamEndPos, 850)
-
+            
+            
             local canHit = canWallbangHit(beamStartPos, beamEndPos)
             if not canHit then
                 return nil, nil
             end
         else
+            
             beamStartPos = beamStartPos + generateRandomOffset(RayConfig.RandomOffset.StartMaxOffset)
             beamEndPos = beamEndPos + generateRandomOffset(RayConfig.RandomOffset.EndMaxOffset)
+        end
+    else
+        
+        if isWallbangEnabled() and WallbangConfig.CheckWalls then
+            local canHit = canWallbangHit(beamStartPos, beamEndPos)
+            if not canHit then
+                return nil, nil
+            end
         end
     end
 
@@ -631,7 +642,6 @@ function createAimshotEvent()
 
     return args1, args2
 end
-
 
 local RagebotGroupBox = Tabs.Main:AddLeftGroupbox('Ragebot')
 
@@ -721,6 +731,14 @@ RagebotGroupBox:AddSlider('PredictionSlider', {
 
 local RaySettingsGroupBox = Tabs.Main:AddRightGroupbox('Ray Settings')
 
+RaySettingsGroupBox:AddColorPicker('ColorPicker1', {
+        Default = Color3.fromRGB(0, 225, 225),
+        Transparency = nil,
+        Callback = function(Value)
+                RayConfig.RayColor = Value
+        end
+})
+        
 RaySettingsGroupBox:AddToggle('colorToggle', {
     Text = 'RandomRayColor',
     Default = true,
