@@ -90,7 +90,7 @@ local function hasReviveAura(player)
                 end
             end
         end
-        
+
         for _, part in pairs(player.Character:GetChildren()) do
             if part:IsA("Part") then
                 for _, child in pairs(part:GetChildren()) do
@@ -108,7 +108,7 @@ local function setupPlayerQuitMonitoring()
     Players.PlayerRemoving:Connect(function(player)
         local playerName = player.Name
         local playerDisplayName = player.DisplayName
-        
+
         for i, name in ipairs(PlayerListConfig.Blacklist) do
             if name:lower() == playerName:lower() or name:lower() == playerDisplayName:lower() then
                 table.remove(PlayerListConfig.Blacklist, i)
@@ -119,7 +119,7 @@ local function setupPlayerQuitMonitoring()
                 break
             end
         end
-        
+
         for i, name in ipairs(PlayerListConfig.Whitelist) do
             if name:lower() == playerName:lower() or name:lower() == playerDisplayName:lower() then
                 table.remove(PlayerListConfig.Whitelist, i)
@@ -137,21 +137,21 @@ local function checkInputMatches()
     if PlayerListConfig.InputName == "" then
         return
     end
-    
+
     local inputText = PlayerListConfig.InputName:lower()
     local foundMatches = {}
-    
+
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             local nameMatch = player.Name:lower():find(inputText)
             local displayNameMatch = player.DisplayName:lower():find(inputText)
-            
+
             if nameMatch or displayNameMatch then
                 table.insert(foundMatches, player)
             end
         end
     end
-    
+
     if #foundMatches > 0 then
         for _, player in ipairs(foundMatches) do
             Library:Notify("Matched player: " .. player.Name .. " (" .. player.DisplayName .. ")", 3)
@@ -167,64 +167,64 @@ local function canWallbangHit(startPos, hitPosition)
     if not isWallbangEnabled() or not WallbangConfig.CheckWalls then
         return true
     end
-    
+
     if not startPos or not hitPosition then
         return false
     end
-    
+
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
     raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-    
+
     local direction = (hitPosition - startPos).Unit
     local distance = (hitPosition - startPos).Magnitude
-    
+
     local currentPos = startPos
     local remainingDistance = distance
     local totalWallThickness = 0
     local maxWalls = 3
     local maxWallThickness = 1
-    
+
     for i = 1, maxWalls do
         local raycastResult = Workspace:Raycast(currentPos, direction * remainingDistance, raycastParams)
-        
+
         if not raycastResult then
             return true
         end
-        
+
         local hitPos = raycastResult.Position
         local hitDistance = (hitPos - currentPos).Magnitude
-        
+
         local wallThickness = 0
         local thicknessRay = Workspace:Raycast(hitPos + direction * 0.1, direction * 10, raycastParams)
         if thicknessRay then
             wallThickness = (thicknessRay.Position - hitPos).Magnitude
         end
-        
+
         totalWallThickness = totalWallThickness + wallThickness
-        
+
         if totalWallThickness > maxWallThickness then
             return false
         end
-        
+
         local hitPart = raycastResult.Instance
         local model = hitPart:FindFirstAncestorOfClass("Model")
-        
+
         if model then
             local humanoid = model:FindFirstChild("Humanoid")
             if humanoid then
                 return true
             end
         end
-        
+
         currentPos = hitPos + direction * (wallThickness + 0.1)
         remainingDistance = distance - (currentPos - startPos).Magnitude
-        
+
         if remainingDistance <= 0 then
             return true
         end
     end
-    
+
     return false
 end
 
@@ -232,28 +232,28 @@ local function shouldIgnorePlayer(player)
     if not HealthFilterConfig.Enabled then
         return false
     end
-    
+
     if player == LocalPlayer then
         return true
     end
-    
+
     if not player.Character then
         return true
     end
-    
+
     local humanoid = player.Character:FindFirstChild("Humanoid")
     if not humanoid then
         return true
     end
-    
+
     if humanoid.Health <= HealthFilterConfig.MinHealth then
         return true
     end
-    
+
     if hasReviveAura(player) then
         return true
     end
-    
+
     return false
 end
 
@@ -273,28 +273,28 @@ local function shouldTargetPlayer(player, shouldNotify)
     if player == LocalPlayer then
         return false
     end
-    
+
     if not player.Character then
         return false
     end
-    
+
     local humanoid = player.Character:FindFirstChild("Humanoid")
     if not humanoid or humanoid.Health <= 0 then
         return false
     end
-    
+
     if hasReviveAura(player) then
         return false
     end
-    
+
     if #PlayerListConfig.Blacklist > 0 then
         return isPlayerInList(player, PlayerListConfig.Blacklist, shouldNotify)
     end
-    
+
     if #PlayerListConfig.Whitelist > 0 then
         return not isPlayerInList(player, PlayerListConfig.Whitelist, shouldNotify)
     end
-    
+
     return true
 end
 
@@ -318,39 +318,42 @@ function generateRandomOffset(maxDistance)
         math.random() - 0.5,
         math.random() - 0.5
     ).Unit
-    
+
     local randomDistance = math.random() * maxDistance
     return randomDirection * randomDistance
 end
 
 function createBeam(startPos, endPos)
-    local distance = (startPos - endPos).Magnitude
+    local direction = (endPos - startPos).Unit
+    local extendedEndPos = endPos + direction * 50
     
+    local distance = (startPos - extendedEndPos).Magnitude
+
     local beam = Instance.new("Part")
     beam.Material = Enum.Material.Neon
     beam.BrickColor = BrickColor.new("Cyan")
     beam.Size = Vector3.new(0.1, 0.1, distance)
-    beam.CFrame = CFrame.lookAt((startPos + endPos) / 2, endPos)
+    beam.CFrame = CFrame.lookAt((startPos + extendedEndPos) / 2, extendedEndPos)
     beam.Anchored = true
     beam.CanCollide = false
     beam.Transparency = 1
-    
+
     local attachment0 = Instance.new("Attachment")
     local attachment1 = Instance.new("Attachment")
     attachment0.Position = Vector3.new(0, 0, -distance/2)
     attachment1.Position = Vector3.new(0, 0, distance/2)
     attachment0.Parent = beam
     attachment1.Parent = beam
-    
+
     local beamEffect = Instance.new("Beam")
     beamEffect.Attachment0 = attachment0
     beamEffect.Attachment1 = attachment1
-    
+
     local currentRayColor = RayConfig.RayColor
     if RayConfig.RandomRayColor then
         currentRayColor = generateRandomColor()
     end
-    
+
     beamEffect.Color = ColorSequence.new(currentRayColor)
     beamEffect.Width0 = RayConfig.RaySize
     beamEffect.Width1 = RayConfig.RaySize
@@ -361,37 +364,37 @@ function createBeam(startPos, endPos)
     beamEffect.LightInfluence = 0
     beamEffect.FaceCamera = true
     beamEffect.Parent = beam
-    
+
     beam.Parent = Workspace
-    
+
     local fadeSteps = 20
     local fadeInterval = RayConfig.FadeDuration / fadeSteps
-    
+
     coroutine.wrap(function()
         wait(RayConfig.RayDuration)
-        
+
         for i = 1, fadeSteps do
             if beam and beam.Parent then
                 local alpha = i / fadeSteps
                 local lightMultiplier = 1 - alpha
-                
+
                 beamEffect.Width0 = RayConfig.RaySize * lightMultiplier
                 beamEffect.Width1 = RayConfig.RaySize * lightMultiplier
                 beamEffect.LightEmission = RayConfig.RayBrightness * lightMultiplier
-                
+
                 beamEffect.Transparency = NumberSequence.new(alpha)
-                
+
                 wait(fadeInterval)
             else
                 break
             end
         end
-        
+
         if beam and beam.Parent then
             beam:Destroy()
         end
     end)()
-    
+
     return beam
 end
 
@@ -399,49 +402,49 @@ function getCurrentWeapon()
     if not LocalPlayer.Character then
         return nil
     end
-    
+
     for _, item in pairs(LocalPlayer.Character:GetChildren()) do
         if item:IsA("Tool") then
             return item
         end
     end
-    
+
     return nil
 end
 
 function getClosestEnemy()
     local closestPlayer = nil
     local shortestDistance = math.huge
-    
+
     for _, player in ipairs(Players:GetPlayers()) do
         if not shouldTargetPlayer(player, false) then
             continue
         end
-        
+
         if shouldIgnorePlayer(player) then
             continue
         end
-        
+
         if player.Character then
             local humanoid = player.Character:FindFirstChild("Humanoid")
             local head = player.Character:FindFirstChild("Head")
-            
+
             if humanoid and humanoid.Health > 0 and head then
                 if isWallbangEnabled() and WallbangConfig.CheckWalls then
                     local playerHead = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
                     local startPos = playerHead and playerHead.Position or Camera.CFrame.Position
-                    
+
                     local hitPosition = head.Position
-                    
+
                     local targetVelocity = head.Velocity or Vector3.new(0, 0, 0)
                     hitPosition = hitPosition + targetVelocity * AutoShoot.PredictionAmount
-                    
+
                     local canHit = canWallbangHit(startPos, hitPosition)
                     if not canHit then
                         continue
                     end
                 end
-                
+
                 local distance = (head.Position - Camera.CFrame.Position).Magnitude
                 if distance < shortestDistance then
                     shortestDistance = distance
@@ -450,29 +453,29 @@ function getClosestEnemy()
             end
         end
     end
-    
+
     return closestPlayer
 end
 
 function updateAmmo(weapon, targetHead)
     local values = weapon:FindFirstChild("Values")
     local hitMarker = weapon:FindFirstChild("Hitmarker")
-    
+
     if not values or not hitMarker then
         return false
     end
-    
+
     local ammo = values:FindFirstChild("SERVER_Ammo")           
     local storedAmmo = values:FindFirstChild("SERVER_StoredAmmo") 
-    
+
     if not ammo or not storedAmmo or ammo.Value <= 0 then
         return false
     end
-    
+
     storedAmmo.Value = storedAmmo.Value
     ammo.Value = math.max(ammo.Value - 1, 0)
     hitMarker:Fire(targetHead)
-    
+
     return true
 end
 
@@ -481,13 +484,13 @@ function createReloadEvent()
     if not tool then
         return nil
     end
-    
+
     local args = {
         tick(),
         "KLWE89U0",
         tool
     }
-    
+
     return args
 end
 
@@ -499,10 +502,9 @@ local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
     local bestStartPos = startPos
     local bestTargetPos = targetPos
     local minWallDistance = math.huge  
-    local bestTargetDistance = math.huge  
     
     for i = 1, maxAttempts do
-        
+       
         local goldenRatio = (1 + math.sqrt(5)) / 2
         local theta = 2 * math.pi * i / goldenRatio
         local phi = math.acos(1 - 2 * (i + 0.5) / maxAttempts)
@@ -519,10 +521,6 @@ local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
             z * radius   
         )
         
-        local targetRadius = RayConfig.RandomOffset.EndMaxOffset
-        
-        local currentTargetRadius = targetRadius * (1 - (i-1) / maxAttempts)
-        
         local targetGoldenRatio = (1 + math.sqrt(5)) / 2
         local targetTheta = 2 * math.pi * (i + 0.5) / targetGoldenRatio  
         local targetPhi = math.acos(1 - 2 * (i + 0.5) / maxAttempts)
@@ -531,10 +529,12 @@ local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
         local targetY = math.sin(targetTheta) * math.sin(targetPhi)
         local targetZ = math.cos(targetPhi)
         
+        local targetRadius = RayConfig.RandomOffset.EndMaxOffset
+        
         local testTargetPos = targetPos + Vector3.new(
-            targetX * currentTargetRadius, 
-            targetY * currentTargetRadius,  
-            targetZ * currentTargetRadius  
+            targetX * targetRadius, 
+            targetY * targetRadius,  
+            targetZ * targetRadius  
         )
         
         local raycastParams = RaycastParams.new()
@@ -547,29 +547,15 @@ local function findOptimalShootingPosition(startPos, targetPos, maxAttempts)
         local raycastResult = Workspace:Raycast(testStartPos, direction * distance, raycastParams)
         
         if not raycastResult then
-            
-            local targetDistance = (testTargetPos - targetPos).Magnitude
-            
-            if targetDistance < bestTargetDistance then
-                bestTargetDistance = targetDistance
-                bestStartPos = testStartPos
-                bestTargetPos = testTargetPos
-                
-                if targetDistance < 0.5 then
-                    return bestStartPos, bestTargetPos
-                end
-            end
-        else
-            local hitDistance = (raycastResult.Position - testStartPos).Magnitude
-            
-            local targetDistance = (testTargetPos - targetPos).Magnitude
-            
-            if hitDistance < minWallDistance or (hitDistance == minWallDistance and targetDistance < bestTargetDistance) then
-                minWallDistance = hitDistance
-                bestTargetDistance = targetDistance
-                bestStartPos = testStartPos
-                bestTargetPos = testTargetPos
-            end
+            return testStartPos, testTargetPos
+        end
+        
+        local hitDistance = (raycastResult.Position - testStartPos).Magnitude
+        
+        if hitDistance < minWallDistance then
+            minWallDistance = hitDistance
+            bestStartPos = testStartPos
+            bestTargetPos = testTargetPos
         end
     end
     
@@ -581,32 +567,32 @@ function createAimshotEvent()
     if not targetData then
         return nil, nil
     end
-    
+
     local targetHead = targetData.Head
     local tool = getCurrentWeapon()
     if not tool then
         return nil, nil
     end
-    
+
     if not updateAmmo(tool, targetHead) then
         return nil, nil
     end
-    
+
     local playerHead = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
     local startPos = playerHead and playerHead.Position or Camera.CFrame.Position
-    
+
     local hitPosition = targetHead.Position
-    
+
     local targetVelocity = targetHead.Velocity or Vector3.new(0, 0, 0)
     hitPosition = hitPosition + targetVelocity * AutoShoot.PredictionAmount
-    
+
     local beamStartPos = startPos
     local beamEndPos = hitPosition
-    
+
     if RayConfig.RandomOffset.Enabled then
         if isWallbangEnabled() and WallbangConfig.CheckWalls then
             beamStartPos, beamEndPos = findOptimalShootingPosition(beamStartPos, beamEndPos, 850)
-            
+
             local canHit = canWallbangHit(beamStartPos, beamEndPos)
             if not canHit then
                 return nil, nil
@@ -616,13 +602,13 @@ function createAimshotEvent()
             beamEndPos = beamEndPos + generateRandomOffset(RayConfig.RandomOffset.EndMaxOffset)
         end
     end
-    
+
     local hitDirection = (beamEndPos - beamStartPos).Unit
-    
+
     createBeam(beamStartPos, beamEndPos)
-    
+
     local randomKey = RandomString(30) .. "0"
-    
+
     local args1 = {
         tick(), 
         randomKey, 
@@ -632,7 +618,7 @@ function createAimshotEvent()
         {hitDirection}, 
         false
     }
-    
+
     local args2 = {
         "🧈", 
         tool, 
@@ -642,7 +628,7 @@ function createAimshotEvent()
         beamEndPos,
         hitDirection
     }
-    
+
     return args1, args2
 end
 
@@ -781,7 +767,7 @@ PlayerListGroupBox:AddButton('Add to Blacklist', function()
     if PlayerListConfig.InputName ~= "" then
         table.insert(PlayerListConfig.Blacklist, PlayerListConfig.InputName)
         Library:Notify("Added " .. PlayerListConfig.InputName .. " to blacklist", 3)
-        
+
         if blacklistLabel then
             blacklistLabel:SetText('Blacklist: ' .. #PlayerListConfig.Blacklist)
         end
@@ -792,7 +778,7 @@ PlayerListGroupBox:AddButton('Add to Whitelist', function()
     if PlayerListConfig.InputName ~= "" then
         table.insert(PlayerListConfig.Whitelist, PlayerListConfig.InputName)
         Library:Notify("Added " .. PlayerListConfig.InputName .. " to whitelist", 3)
-        
+
         if whitelistLabel then
             whitelistLabel:SetText('Whitelist: ' .. #PlayerListConfig.Whitelist)
         end
@@ -802,7 +788,7 @@ end)
 PlayerListGroupBox:AddButton('Clear Blacklist', function()
     PlayerListConfig.Blacklist = {}
     Library:Notify("Blacklist cleared", 3)
-    
+
     if blacklistLabel then
         blacklistLabel:SetText('Blacklist: ' .. #PlayerListConfig.Blacklist)
     end
@@ -811,7 +797,7 @@ end)
 PlayerListGroupBox:AddButton('Clear Whitelist', function()
     PlayerListConfig.Whitelist = {}
     Library:Notify("Whitelist cleared", 3)
-    
+
     if whitelistLabel then
         whitelistLabel:SetText('Whitelist: ' .. #PlayerListConfig.Whitelist)
     end
@@ -848,7 +834,7 @@ coroutine.wrap(function()
     while true do
         if AutoShoot.Enabled then
             local currentTime = tick()
-            
+
             if currentTime - AutoShoot.LastShotTime >= AutoShoot.Interval then
                 local args1, args2 = createAimshotEvent()
                 if args1 and args2 then
@@ -856,12 +842,12 @@ coroutine.wrap(function()
                         GNX_S:FireServer(unpack(args1))
                         ZFKLF__H:FireServer(unpack(args2))
                     end)()
-                    
+
                     AutoShoot.LastShotTime = currentTime
                 end
             end
         end
-        
+
         task.wait(0.01)
     end
 end)()
@@ -870,19 +856,19 @@ coroutine.wrap(function()
     while true do
         if ReloadConfig.Enabled then
             local currentTime = tick()
-            
+
             if currentTime - ReloadConfig.LastReloadTime >= ReloadConfig.Interval then
                 local args = createReloadEvent()
                 if args then
                     coroutine.wrap(function()
                         GNX_R:FireServer(unpack(args))
                     end)()
-                    
+
                     ReloadConfig.LastReloadTime = currentTime
                 end
             end
         end
-        
+
         task.wait(0.01)
     end
 end)()
