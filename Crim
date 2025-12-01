@@ -731,14 +731,6 @@ RagebotGroupBox:AddSlider('PredictionSlider', {
 
 local RaySettingsGroupBox = Tabs.Main:AddRightGroupbox('Ray Settings')
 
-RaySettingsGroupBox:AddColorPicker('ColorPicker1', {
-        Default = Color3.fromRGB(0, 225, 225),
-        Transparency = nil,
-        Callback = function(Value)
-                RayConfig.RayColor = Value
-        end
-})
-        
 RaySettingsGroupBox:AddToggle('colorToggle', {
     Text = 'RandomRayColor',
     Default = true,
