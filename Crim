@@ -11,7 +11,7 @@ Library.ShowCustomCursor = true
 Library.NotifySide = "Left"
 
 local Window = Library:CreateWindow({
-    Title = 'CasCade。',
+    Title = 'CasCade v1.2-G',
     Center = true,
     AutoShow = true,
     Resizable = true,
@@ -76,31 +76,29 @@ local RayConfig = {
     RandomOffset = {
         Enabled = true,         
         StartMaxOffset = 18.5,
-        EndMaxOffset = 23.2
+        EndMaxOffset = 23.2,
+        maxatt = 850
     }
 }
 
 local function hasReviveAura(player)
-    if player and player.Character then
-        local humanoid = player.Character:FindFirstChild("Humanoid")
-        if humanoid then
-            for _, child in pairs(humanoid:GetChildren()) do
-                if child:IsA("BoolValue") and child.Name == "ReviveAura" and child.Value == true then
-                    return true
-                end
-            end
-        end
-
-        for _, part in pairs(player.Character:GetChildren()) do
-            if part:IsA("Part") then
-                for _, child in pairs(part:GetChildren()) do
-                    if child:IsA("ParticleEmitter") and child.Name == "ReviveAura" then
-                        return true
-                    end
-                end
-            end
+    if not player or not player.Character then
+        return false
+    end
+    
+    local spawnFF = player.Character:FindFirstChild("SpawnFF")
+    local protectionFF = player.Character:FindFirstChild("ProtectionFF")
+    
+    if spawnFF or protectionFF then
+        return true
+    end
+    
+    for _, child in pairs(player.Character:GetDescendants()) do
+        if child.Name == "SpawnFF" or child.Name == "ProtectionFF" then
+            return true
         end
     end
+    
     return false
 end
 
@@ -112,7 +110,7 @@ local function setupPlayerQuitMonitoring()
         for i, name in ipairs(PlayerListConfig.Blacklist) do
             if name:lower() == playerName:lower() or name:lower() == playerDisplayName:lower() then
                 table.remove(PlayerListConfig.Blacklist, i)
-                Library:Notify(playerName .. " (黑名单) 已退出游戏", 5)
+                Library:Notify(playerName .. " black out", 5)
                 if blacklistLabel then
                     blacklistLabel:SetText('Blacklist: ' .. #PlayerListConfig.Blacklist)
                 end
@@ -123,7 +121,7 @@ local function setupPlayerQuitMonitoring()
         for i, name in ipairs(PlayerListConfig.Whitelist) do
             if name:lower() == playerName:lower() or name:lower() == playerDisplayName:lower() then
                 table.remove(PlayerListConfig.Whitelist, i)
-                Library:Notify(playerName .. " (白名单) 已退出游戏", 5)
+                Library:Notify(playerName .. " white out", 5)
                 if whitelistLabel then
                     whitelistLabel:SetText('Whitelist: ' .. #PlayerListConfig.Whitelist)
                 end
@@ -592,7 +590,7 @@ function createAimshotEvent()
     if RayConfig.RandomOffset.Enabled then
         if isWallbangEnabled() and WallbangConfig.CheckWalls then
             
-            beamStartPos, beamEndPos = findOptimalShootingPosition(beamStartPos, beamEndPos, 850)
+            beamStartPos, beamEndPos = findOptimalShootingPosition(beamStartPos, beamEndPos, RayConfig.RandomOffset.maxatt)
             
             
             local canHit = canWallbangHit(beamStartPos, beamEndPos)
@@ -672,44 +670,6 @@ RagebotGroupBox:AddToggle('ReloadToggle', {
     end
 })
 
-RagebotGroupBox:AddToggle('WallbangToggle', {
-    Text = 'Wallbang',
-    Default = true,
-    Callback = function(Value)
-        WallbangConfig.Enabled = Value
-    end
-})
-
-RagebotGroupBox:AddSlider('StartMaxOffsetSlider', {
-    Text = 'Start Max Offset',
-    Default = 18.5,
-    Min = 0,
-    Max = 50,
-    Rounding = 1,
-    Callback = function(Value)
-        RayConfig.RandomOffset.StartMaxOffset = Value
-    end
-})
-
-RagebotGroupBox:AddSlider('EndMaxOffsetSlider', {
-    Text = 'End Max Offset',
-    Default = 23.2,
-    Min = 0,
-    Max = 50,
-    Rounding = 1,
-    Callback = function(Value)
-        RayConfig.RandomOffset.EndMaxOffset = Value
-    end
-})
-
-RagebotGroupBox:AddToggle('WallCheckToggle', {
-    Text = 'WallCheck',
-    Default = true,
-    Callback = function(Value)
-        WallbangConfig.CheckWalls = Value
-    end
-})
-
 RagebotGroupBox:AddToggle('HealthFilterToggle', {
     Text = 'Check Knocks',
     Default = false,
@@ -729,14 +689,75 @@ RagebotGroupBox:AddSlider('PredictionSlider', {
     end
 })
 
+local wallbangss = Tabs.Main:AddLeftGroupbox('wallbang')
+
+wallbangss:AddToggle('WallbangToggle', {
+    Text = 'Wallbang',
+    Default = true,
+    Callback = function(Value)
+        WallbangConfig.Enabled = Value
+    end
+})
+
+wallbangss:AddSlider('idkMaxOffset', {
+    Text = 'maxatt',
+    Default = 850,
+    Min = 200,
+    Max = 3000,
+    Rounding = 0,
+    Callback = function(Value)
+        RayConfig.RandomOffset.maxatt = Value
+    end
+})
+
+wallbangss:AddSlider('StartMaxOffsetSlider', {
+    Text = 'shoot',
+    Default = 15,
+    Min = 0,
+    Max = 30,
+    Rounding = 1,
+    Callback = function(Value)
+        RayConfig.RandomOffset.StartMaxOffset = Value
+    end
+})
+
+wallbangss:AddSlider('EndMaxOffsetSlider', {
+    Text = 'hit',
+    Default = 15,
+    Min = 0,
+    Max = 30,
+    Rounding = 1,
+    Callback = function(Value)
+        RayConfig.RandomOffset.EndMaxOffset = Value
+    end
+})
+
+wallbangss:AddToggle('WallCheckToggle', {
+    Text = 'WallCheck',
+    Default = true,
+    Callback = function(Value)
+        WallbangConfig.CheckWalls = Value
+    end
+})
+
 local RaySettingsGroupBox = Tabs.Main:AddRightGroupbox('Ray Settings')
 
+        
 RaySettingsGroupBox:AddToggle('colorToggle', {
     Text = 'RandomRayColor',
     Default = true,
     Callback = function(Value)
         RayConfig.RandomRayColor = Value
     end
+    
+}):AddColorPicker('ColorRay', {
+        Default = Color3.new(0, 225, 225),
+        Title = 'Raycolor',
+        Transparency = 0,
+        Callback = function(Value, Transparency)
+             RayConfig.RayColor = Value
+        end
+
 })
 
 RaySettingsGroupBox:AddSlider('RaySizeSlider', {
