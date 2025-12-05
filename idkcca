@@ -1,0 +1,1331 @@
+local repo = 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+Library.ShowCustomCursor = true
+Library.NotifySide = "Left"
+
+local Window = Library:CreateWindow({
+    Title = 'CasCade v1.4',
+    Center = true,
+    AutoShow = true,
+    Resizable = true,
+    ShowCustomCursor = true,
+    NotifySide = "Left",
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+local Tabs = {
+    Main = Window:AddTab('Main'),
+    Main2 = Window:AddTab('Esp'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
+}
+
+local AutoShoot = {
+    Enabled = false,
+    Interval = 0.01,
+    LastShotTime = 0,
+    PredictionAmount = 0.15
+}
+
+local ReloadConfig = {
+    Enabled = false,
+    Interval = 0.1,
+    LastReloadTime = 0
+}
+
+local WallbangConfig = {
+    Enabled = true,
+    CheckWalls = true
+}
+
+local HealthFilterConfig = {
+    Enabled = false,
+    MinHealth = 3
+}
+
+local PlayerListConfig = {
+    Blacklist = {},
+    Whitelist = {},
+    InputName = ""   
+}
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Workspace, RunService, Players, CoreGui, Lighting = cloneref(game:GetService("Workspace")), cloneref(game:GetService("RunService")), cloneref(game:GetService("Players")), game:GetService("CoreGui"), cloneref(game:GetService("Lighting"))
+
+local events = ReplicatedStorage:WaitForChild("Events")
+local GNX_S = events:WaitForChild("GNX_S")
+local ZFKLF__H = events:WaitForChild("ZFKLF__H")
+local GNX_R = events:WaitForChild("GNX_R")  
+
+local RayConfig = {
+    RaySize = 1,
+    RayColor = Color3.fromRGB(0, 255, 255),
+    RayBrightness = 5,
+    RayDuration = 2,
+    FadeDuration = 0.5,
+    RandomRayColor = true,
+    RandomOffset = {
+        Enabled = true,         
+        StartMaxOffset = 18.5,
+        EndMaxOffset = 23.2,
+        maxatt = 850
+    }
+}
+
+local ESP = {
+    Enabled = true,
+    TeamCheck = true,
+    MaxDistance = 200,
+    FontSize = 11,
+    FadeOut = {
+        OnDistance = true,
+        OnDeath = false,
+        OnLeave = false,
+    },
+    Drawing = {
+        Names = {
+            Enabled = true,
+            RGB = Color3.fromRGB(255, 255, 255),
+        },
+        Distances = {
+            Enabled = true, 
+            Position = "Bottom",  
+            RGB = Color3.fromRGB(255, 255, 255),
+        },
+        Healthbar = {
+            Enabled = true,  
+            HealthText = false,
+            Width = 2.5,
+        },
+        Boxes = {
+            Full = {
+                Enabled = true,
+                RGB = Color3.fromRGB(255, 255, 255),
+            },
+            Corner = {
+                Enabled = true,
+                RGB = Color3.fromRGB(255, 255, 255),
+            },
+        };
+    };
+    Connections = {
+        RunService = RunService;
+    };
+}
+
+local lplayer = Players.LocalPlayer;
+local Cam = Workspace.CurrentCamera;
+
+local Functions = {}
+do
+    function Functions:Create(Class, Properties)
+        local _Instance = typeof(Class) == 'string' and Instance.new(Class) or Class
+        for Property, Value in pairs(Properties) do
+            _Instance[Property] = Value
+        end
+        return _Instance;
+    end
+    
+    function Functions:FadeOutOnDist(element, distance)
+        local transparency = math.max(0.1, 1 - (distance / ESP.MaxDistance))
+        if element:IsA("TextLabel") then
+            element.TextTransparency = 1 - transparency
+        elseif element:IsA("Frame") then
+            element.BackgroundTransparency = 1 - transparency
+        end
+    end;  
+end;
+
+local function getESPColor(player)
+    local playerName = player.Name
+    local playerDisplayName = player.DisplayName
+    
+    for _, name in ipairs(PlayerListConfig.Whitelist) do
+        if name:lower() == playerName:lower() or name:lower() == playerDisplayName:lower() then
+            return Color3.fromRGB(0, 255, 0)
+        end
+    end
+    
+    for _, name in ipairs(PlayerListConfig.Blacklist) do
+        if name:lower() == playerName:lower() or name:lower() == playerDisplayName:lower() then
+            return Color3.fromRGB(255, 0, 0)
+        end
+    end
+    
+    return Color3.fromRGB(255, 255, 255)
+end
+
+local function shouldShowESP(player)
+    -- 如果黑名单不为空，检查玩家是否在黑名单中
+    if #PlayerListConfig.Blacklist > 0 then
+        local playerName = player.Name:lower()
+        local playerDisplayName = player.DisplayName:lower()
+        
+        for _, name in ipairs(PlayerListConfig.Blacklist) do
+            local lowerName = name:lower()
+            if playerName:find(lowerName) or playerDisplayName:find(lowerName) then
+                return true  -- 在黑名单中，显示红色
+            end
+        end
+        return false  -- 不在黑名单中，不显示
+    end
+    return true
+end
+
+do 
+    local ScreenGui = Functions:Create("ScreenGui", {
+        Parent = CoreGui,
+        Name = "ESPHolder",
+    });
+
+    local DupeCheck = function(plr)
+        if ScreenGui:FindFirstChild(plr.Name) then
+            ScreenGui[plr.Name]:Destroy()
+        end
+    end
+
+    local CreateESP = function(plr)
+        if not ESP.Enabled then return end
+        
+        if not shouldShowESP(plr) then
+            return
+        end
+        
+        coroutine.wrap(DupeCheck)(plr) 
+        
+        local espColor = getESPColor(plr)
+        
+        local Name = Functions:Create("TextLabel", {
+            Parent = ScreenGui, 
+            Position = UDim2.new(0.5, 0, 0, -11), 
+            Size = UDim2.new(0, 100, 0, 20), 
+            AnchorPoint = Vector2.new(0.5, 0.5), 
+            BackgroundTransparency = 1, 
+            TextColor3 = espColor,
+            FontFace = Font.new("rbxassetid://12187371840"), 
+            TextSize = ESP.FontSize, 
+            TextStrokeTransparency = 0, 
+            TextStrokeColor3 = Color3.fromRGB(0, 0, 0), 
+            RichText = true
+        })
+        
+        local Distance = Functions:Create("TextLabel", {
+            Parent = ScreenGui, 
+            Position = UDim2.new(0.5, 0, 0, 11), 
+            Size = UDim2.new(0, 100, 0, 20), 
+            AnchorPoint = Vector2.new(0.5, 0.5), 
+            BackgroundTransparency = 1, 
+            TextColor3 = espColor,
+            FontFace = Font.new("rbxassetid://12187371840"), 
+            TextSize = ESP.FontSize, 
+            TextStrokeTransparency = 0, 
+            TextStrokeColor3 = Color3.fromRGB(0, 0, 0), 
+            RichText = true
+        })
+        
+        local Box = Functions:Create("Frame", {
+            Parent = ScreenGui, 
+            BackgroundColor3 = Color3.fromRGB(0, 0, 0), 
+            BackgroundTransparency = 0.75, 
+            BorderSizePixel = 0
+        })
+        
+        local Healthbar = Functions:Create("Frame", {
+            Parent = ScreenGui, 
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255), 
+            BackgroundTransparency = 0
+        })
+        
+        local BehindHealthbar = Functions:Create("Frame", {
+            Parent = ScreenGui, 
+            ZIndex = -1, 
+            BackgroundColor3 = Color3.fromRGB(0, 0, 0), 
+            BackgroundTransparency = 0
+        })
+        
+        local HealthText = Functions:Create("TextLabel", {
+            Parent = ScreenGui, 
+            Position = UDim2.new(0.5, 0, 0, 31), 
+            Size = UDim2.new(0, 100, 0, 20), 
+            AnchorPoint = Vector2.new(0.5, 0.5), 
+            BackgroundTransparency = 1, 
+            TextColor3 = espColor,
+            FontFace = Font.new("rbxassetid://12187371840"), 
+            TextSize = ESP.FontSize, 
+            TextStrokeTransparency = 0, 
+            TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        })
+        
+        local LeftTop = Functions:Create("Frame", {
+            Parent = ScreenGui, 
+            BackgroundColor3 = espColor,
+            Position = UDim2.new(0, 0, 0, 0)
+        })
+        
+        local LeftSide = Functions:Create("Frame", {
+            Parent = ScreenGui, 
+            BackgroundColor3 = espColor,
+            Position = UDim2.new(0, 0, 0, 0)
+        })
+        
+        local RightTop = Functions:Create("Frame", {
+            Parent = ScreenGui, 
+            BackgroundColor3 = espColor,
+            Position = UDim2.new(0, 0, 0, 0)
+        })
+        
+        local RightSide = Functions:Create("Frame", {
+            Parent = ScreenGui, 
+            BackgroundColor3 = espColor,
+            Position = UDim2.new(0, 0, 0, 0)
+        })
+        
+        local BottomSide = Functions:Create("Frame", {
+            Parent = ScreenGui, 
+            BackgroundColor3 = espColor,
+            Position = UDim2.new(0, 0, 0, 0)
+        })
+        
+        local BottomDown = Functions:Create("Frame", {
+            Parent = ScreenGui, 
+            BackgroundColor3 = espColor,
+            Position = UDim2.new(0, 0, 0, 0)
+        })
+        
+        local BottomRightSide = Functions:Create("Frame", {
+            Parent = ScreenGui, 
+            BackgroundColor3 = espColor,
+            Position = UDim2.new(0, 0, 0, 0)
+        })
+        
+        local BottomRightDown = Functions:Create("Frame", {
+            Parent = ScreenGui, 
+            BackgroundColor3 = espColor,
+            Position = UDim2.new(0, 0, 0, 0)
+        })
+        
+        local Updater = function()
+            local Connection;
+            local function HideESP()
+                Box.Visible = false;
+                Name.Visible = false;
+                Distance.Visible = false;
+                Healthbar.Visible = false;
+                BehindHealthbar.Visible = false;
+                HealthText.Visible = false;
+                LeftTop.Visible = false;
+                LeftSide.Visible = false;
+                BottomSide.Visible = false;
+                BottomDown.Visible = false;
+                RightTop.Visible = false;
+                RightSide.Visible = false;
+                BottomRightSide.Visible = false;
+                BottomRightDown.Visible = false;
+                if not plr then
+                    ScreenGui:Destroy();
+                    if Connection then
+                        Connection:Disconnect();
+                    end
+                end
+            end
+            
+            Connection = RunService.RenderStepped:Connect(function()
+                if not ESP.Enabled then
+                    HideESP()
+                    return
+                end
+                
+                if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    local HRP = plr.Character.HumanoidRootPart
+                    local Humanoid = plr.Character:WaitForChild("Humanoid");
+                    local Pos, OnScreen = Cam:WorldToScreenPoint(HRP.Position)
+                    local Dist = (Cam.CFrame.Position - HRP.Position).Magnitude
+                    
+                    if OnScreen and Dist <= ESP.MaxDistance then
+                        local Size = HRP.Size.Y
+                        local scaleFactor = (Size * Cam.ViewportSize.Y) / (Pos.Z * 2)
+                        local w, h = 3 * scaleFactor, 4.5 * scaleFactor
+
+                        if ESP.FadeOut.OnDistance then
+                            Functions:FadeOutOnDist(Box, Dist)
+                            Functions:FadeOutOnDist(Name, Dist)
+                            Functions:FadeOutOnDist(Distance, Dist)
+                            Functions:FadeOutOnDist(Healthbar, Dist)
+                            Functions:FadeOutOnDist(BehindHealthbar, Dist)
+                            Functions:FadeOutOnDist(HealthText, Dist)
+                            Functions:FadeOutOnDist(LeftTop, Dist)
+                            Functions:FadeOutOnDist(LeftSide, Dist)
+                            Functions:FadeOutOnDist(BottomSide, Dist)
+                            Functions:FadeOutOnDist(BottomDown, Dist)
+                            Functions:FadeOutOnDist(RightTop, Dist)
+                            Functions:FadeOutOnDist(RightSide, Dist)
+                            Functions:FadeOutOnDist(BottomRightSide, Dist)
+                            Functions:FadeOutOnDist(BottomRightDown, Dist)
+                        end
+
+                        if plr ~= lplayer and shouldShowESP(plr) and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChild("Humanoid") then
+                            do 
+                                LeftTop.Visible = ESP.Drawing.Boxes.Corner.Enabled
+                                LeftTop.Position = UDim2.new(0, Pos.X - w / 2, 0, Pos.Y - h / 2)
+                                LeftTop.Size = UDim2.new(0, w / 5, 0, 1)
+                                
+                                LeftSide.Visible = ESP.Drawing.Boxes.Corner.Enabled
+                                LeftSide.Position = UDim2.new(0, Pos.X - w / 2, 0, Pos.Y - h / 2)
+                                LeftSide.Size = UDim2.new(0, 1, 0, h / 5)
+                                
+                                BottomSide.Visible = ESP.Drawing.Boxes.Corner.Enabled
+                                BottomSide.Position = UDim2.new(0, Pos.X - w / 2, 0, Pos.Y + h / 2)
+                                BottomSide.Size = UDim2.new(0, 1, 0, h / 5)
+                                BottomSide.AnchorPoint = Vector2.new(0, 5)
+                                
+                                BottomDown.Visible = ESP.Drawing.Boxes.Corner.Enabled
+                                BottomDown.Position = UDim2.new(0, Pos.X - w / 2, 0, Pos.Y + h / 2)
+                                BottomDown.Size = UDim2.new(0, w / 5, 0, 1)
+                                BottomDown.AnchorPoint = Vector2.new(0, 1)
+                                
+                                RightTop.Visible = ESP.Drawing.Boxes.Corner.Enabled
+                                RightTop.Position = UDim2.new(0, Pos.X + w / 2, 0, Pos.Y - h / 2)
+                                RightTop.Size = UDim2.new(0, w / 5, 0, 1)
+                                RightTop.AnchorPoint = Vector2.new(1, 0)
+                                
+                                RightSide.Visible = ESP.Drawing.Boxes.Corner.Enabled
+                                RightSide.Position = UDim2.new(0, Pos.X + w / 2 - 1, 0, Pos.Y - h / 2)
+                                RightSide.Size = UDim2.new(0, 1, 0, h / 5)
+                                RightSide.AnchorPoint = Vector2.new(0, 0)
+                                
+                                BottomRightSide.Visible = ESP.Drawing.Boxes.Corner.Enabled
+                                BottomRightSide.Position = UDim2.new(0, Pos.X + w / 2, 0, Pos.Y + h / 2)
+                                BottomRightSide.Size = UDim2.new(0, 1, 0, h / 5)
+                                BottomRightSide.AnchorPoint = Vector2.new(1, 1)
+                                
+                                BottomRightDown.Visible = ESP.Drawing.Boxes.Corner.Enabled
+                                BottomRightDown.Position = UDim2.new(0, Pos.X + w / 2, 0, Pos.Y + h / 2)
+                                BottomRightDown.Size = UDim2.new(0, w / 5, 0, 1)
+                                BottomRightDown.AnchorPoint = Vector2.new(1, 1)                                                            
+                            end
+
+                            do 
+                                Box.Position = UDim2.new(0, Pos.X - w / 2, 0, Pos.Y - h / 2)
+                                Box.Size = UDim2.new(0, w, 0, h)
+                                Box.Visible = ESP.Drawing.Boxes.Full.Enabled;
+                                Box.BackgroundTransparency = 1
+                                Tick = tick()
+                            end
+
+                            do  
+                                local health = Humanoid.Health / Humanoid.MaxHealth;
+                                Healthbar.Visible = ESP.Drawing.Healthbar.Enabled;
+                                Healthbar.Position = UDim2.new(0, Pos.X - w / 2 - 6, 0, Pos.Y - h / 2 + h * (1 - health))  
+                                Healthbar.Size = UDim2.new(0, ESP.Drawing.Healthbar.Width, 0, h * health)  
+                                
+                                BehindHealthbar.Visible = ESP.Drawing.Healthbar.Enabled;
+                                BehindHealthbar.Position = UDim2.new(0, Pos.X - w / 2 - 6, 0, Pos.Y - h / 2)  
+                                BehindHealthbar.Size = UDim2.new(0, ESP.Drawing.Healthbar.Width, 0, h)
+                                
+                                if ESP.Drawing.Healthbar.HealthText then
+                                    local healthPercentage = math.floor(Humanoid.Health / Humanoid.MaxHealth * 100)
+                                    HealthText.Position = UDim2.new(0, Pos.X - w / 2 - 6, 0, Pos.Y - h / 2 + h * (1 - healthPercentage / 100) + 3)
+                                    HealthText.Text = tostring(healthPercentage)
+                                    HealthText.Visible = Humanoid.Health < Humanoid.MaxHealth
+                                    HealthText.TextColor3 = espColor
+                                end                        
+                            end
+
+                            do 
+                                Name.Visible = ESP.Drawing.Names.Enabled
+                                Name.Text = plr.Name
+                                Name.Position = UDim2.new(0, Pos.X, 0, Pos.Y - h / 2 - 9)
+                            end
+                            
+                            do 
+                                if ESP.Drawing.Distances.Enabled then
+                                    Distance.Position = UDim2.new(0, Pos.X, 0, Pos.Y + h / 2 + 7)
+                                    Distance.Text = string.format("%d m", math.floor(Dist))
+                                    Distance.Visible = true
+                                else
+                                    Distance.Visible = false
+                                end
+                            end                         
+                        else
+                            HideESP();
+                        end
+                    else
+                        HideESP();
+                    end
+                else
+                    HideESP();
+                end
+            end)
+        end
+        coroutine.wrap(Updater)();
+    end
+
+    do 
+        for _, v in pairs(game:GetService("Players"):GetPlayers()) do
+            if v.Name ~= lplayer.Name then
+                if ESP.Enabled and shouldShowESP(v) then
+                    coroutine.wrap(CreateESP)(v)
+                end
+            end      
+        end
+        
+        game:GetService("Players").PlayerAdded:Connect(function(v)
+            if ESP.Enabled and shouldShowESP(v) then
+                coroutine.wrap(CreateESP)(v)
+            end
+        end);
+    end;
+end;
+
+local function hasReviveAura(player)
+    if not player or not player.Character then
+        return false
+    end
+    
+    local spawnFF = player.Character:FindFirstChild("SpawnFF")
+    local protectionFF = player.Character:FindFirstChild("ProtectionFF")
+    
+    if spawnFF or protectionFF then
+        return true
+    end
+    
+    for _, child in pairs(player.Character:GetDescendants()) do
+        if child.Name == "SpawnFF" or child.Name == "ProtectionFF" then
+            return true
+        end
+    end
+    
+    return false
+end
+
+local function setupPlayerQuitMonitoring()
+    Players.PlayerRemoving:Connect(function(player)
+        local playerName = player.Name
+        local playerDisplayName = player.DisplayName
+
+        for i, name in ipairs(PlayerListConfig.Blacklist) do
+            if name:lower() == playerName:lower() or name:lower() == playerDisplayName:lower() then
+                table.remove(PlayerListConfig.Blacklist, i)
+                Library:Notify(playerName .. " black out", 5)
+                break
+            end
+        end
+
+        for i, name in ipairs(PlayerListConfig.Whitelist) do
+            if name:lower() == playerName:lower() or name:lower() == playerDisplayName:lower() then
+                table.remove(PlayerListConfig.Whitelist, i)
+                Library:Notify(playerName .. " white out", 5)
+                break
+            end
+        end
+    end)
+end
+
+local function checkInputMatches()
+    if PlayerListConfig.InputName == "" then
+        return
+    end
+
+    local inputText = PlayerListConfig.InputName:lower()
+    local foundMatches = {}
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local nameMatch = player.Name:lower():find(inputText)
+            local displayNameMatch = player.DisplayName:lower():find(inputText)
+
+            if nameMatch or displayNameMatch then
+                table.insert(foundMatches, player)
+            end
+        end
+    end
+
+    if #foundMatches > 0 then
+        for _, player in ipairs(foundMatches) do
+            Library:Notify("Matched player: " .. player.Name .. " (" .. player.DisplayName .. ")", 3)
+        end
+    end
+end
+
+local function isWallbangEnabled()
+    return WallbangConfig.Enabled
+end
+
+local function canWallbangHit(startPos, hitPosition)
+    if not isWallbangEnabled() or not WallbangConfig.CheckWalls then
+        return true
+    end
+
+    if not startPos or not hitPosition then
+        return false
+    end
+
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+
+    local direction = (hitPosition - startPos).Unit
+    local distance = (hitPosition - startPos).Magnitude
+
+    local currentPos = startPos
+    local remainingDistance = distance
+    local totalWallThickness = 0
+    local maxWalls = 5
+    local maxWallThickness = 1
+
+    for i = 1, maxWalls do
+        local raycastResult = Workspace:Raycast(currentPos, direction * remainingDistance, raycastParams)
+
+        if not raycastResult then
+            return true
+        end
+
+        local hitPos = raycastResult.Position
+        local hitDistance = (hitPos - currentPos).Magnitude
+
+        local wallThickness = 0
+        local thicknessRay = Workspace:Raycast(hitPos + direction * 0.1, direction * 10, raycastParams)
+        if thicknessRay then
+            wallThickness = (thicknessRay.Position - hitPos).Magnitude
+        end
+
+        totalWallThickness = totalWallThickness + wallThickness
+
+        if totalWallThickness > maxWallThickness then
+            return false
+        end
+
+        local hitPart = raycastResult.Instance
+        local model = hitPart:FindFirstAncestorOfClass("Model")
+
+        if model then
+            local humanoid = model:FindFirstChild("Humanoid")
+            if humanoid then
+                return true
+            end
+        end
+
+        currentPos = hitPos + direction * (wallThickness + 0.1)
+        remainingDistance = distance - (currentPos - startPos).Magnitude
+
+        if remainingDistance <= 0 then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function shouldIgnorePlayer(player)
+    if not HealthFilterConfig.Enabled then
+        return false
+    end
+
+    if player == LocalPlayer then
+        return true
+    end
+
+    if not player.Character then
+        return true
+    end
+
+    local humanoid = player.Character:FindFirstChild("Humanoid")
+    if not humanoid then
+        return true
+    end
+
+    if humanoid.Health <= HealthFilterConfig.MinHealth then
+        return true
+    end
+
+    if hasReviveAura(player) then
+        return true
+    end
+
+    return false
+end
+
+local function isPlayerInList(player, list, shouldNotify)
+    for _, playerName in ipairs(list) do
+        if player.Name:lower():find(playerName:lower()) or player.DisplayName:lower():find(playerName:lower()) then
+            if shouldNotify then
+                Library:Notify("Matched player: " .. player.Name .. " (" .. player.DisplayName .. ")", 3)
+            end
+            return true
+        end
+    end
+    return false
+end
+
+local function shouldTargetPlayer(player, shouldNotify)
+    if player == LocalPlayer then
+        return false
+    end
+
+    if not player.Character then
+        return false
+    end
+
+    local humanoid = player.Character:FindFirstChild("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then
+        return false
+    end
+
+    if hasReviveAura(player) then
+        return false
+    end
+
+    if #PlayerListConfig.Blacklist > 0 then
+        return isPlayerInList(player, PlayerListConfig.Blacklist, shouldNotify)
+    end
+
+    if #PlayerListConfig.Whitelist > 0 then
+        return not isPlayerInList(player, PlayerListConfig.Whitelist, shouldNotify)
+    end
+
+    return true
+end
+
+function RandomString(length)
+    local charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    local result = ""
+    for i = 1, length do
+        local rand = math.random(1, #charset)
+        result = result .. charset:sub(rand, rand)
+    end
+    return result
+end
+
+function generateRandomColor()
+    return Color3.new(math.random(), math.random(), math.random())
+end
+
+function generateRandomOffset(maxDistance)
+    local randomDirection = Vector3.new(
+        math.random() - 0.5,
+        math.random() - 0.5,
+        math.random() - 0.5
+    ).Unit
+
+    local randomDistance = math.random() * maxDistance
+    return randomDirection * randomDistance
+end
+
+function createBeam(startPos, endPos)
+    local direction = (endPos - startPos).Unit
+    local extendedEndPos = endPos + direction * 50
+    
+    local distance = (startPos - extendedEndPos).Magnitude
+
+    local beam = Instance.new("Part")
+    beam.Material = Enum.Material.Neon
+    beam.BrickColor = BrickColor.new("Cyan")
+    beam.Size = Vector3.new(0.1, 0.1, distance)
+    beam.CFrame = CFrame.lookAt((startPos + extendedEndPos) / 2, extendedEndPos)
+    beam.Anchored = true
+    beam.CanCollide = false
+    beam.Transparency = 1
+
+    local attachment0 = Instance.new("Attachment")
+    local attachment1 = Instance.new("Attachment")
+    attachment0.Position = Vector3.new(0, 0, -distance/2)
+    attachment1.Position = Vector3.new(0, 0, distance/2)
+    attachment0.Parent = beam
+    attachment1.Parent = beam
+
+    local beamEffect = Instance.new("Beam")
+    beamEffect.Attachment0 = attachment0
+    beamEffect.Attachment1 = attachment1
+
+    local currentRayColor = RayConfig.RayColor
+    if RayConfig.RandomRayColor then
+        currentRayColor = generateRandomColor()
+    end
+
+    beamEffect.Color = ColorSequence.new(currentRayColor)
+    beamEffect.Width0 = RayConfig.RaySize
+    beamEffect.Width1 = RayConfig.RaySize
+    beamEffect.Texture = "rbxassetid://7136858729"
+    beamEffect.TextureLength = distance / 3
+    beamEffect.TextureSpeed = 1.5
+    beamEffect.LightEmission = RayConfig.RayBrightness
+    beamEffect.LightInfluence = 0
+    beamEffect.FaceCamera = true
+    beamEffect.Parent = beam
+
+    beam.Parent = Workspace
+
+    local fadeSteps = 20
+    local fadeInterval = RayConfig.FadeDuration / fadeSteps
+
+    coroutine.wrap(function()
+        wait(RayConfig.RayDuration)
+
+        for i = 1, fadeSteps do
+            if beam and beam.Parent then
+                local alpha = i / fadeSteps
+                local lightMultiplier = 1 - alpha
+
+                beamEffect.Width0 = RayConfig.RaySize * lightMultiplier
+                beamEffect.Width1 = RayConfig.RaySize * lightMultiplier
+                beamEffect.LightEmission = RayConfig.RayBrightness * lightMultiplier
+
+                beamEffect.Transparency = NumberSequence.new(alpha)
+
+                wait(fadeInterval)
+            else
+                break
+            end
+        end
+
+        if beam and beam.Parent then
+            beam:Destroy()
+        end
+    end)()
+
+    return beam
+end
+
+function getCurrentWeapon()
+    if not LocalPlayer.Character then
+        return nil
+    end
+
+    for _, item in pairs(LocalPlayer.Character:GetChildren()) do
+        if item:IsA("Tool") then
+            return item
+        end
+    end
+
+    return nil
+end
+
+function getClosestEnemy()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if not shouldTargetPlayer(player, false) then
+            continue
+        end
+
+        if shouldIgnorePlayer(player) then
+            continue
+        end
+
+        if player.Character then
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            local head = player.Character:FindFirstChild("Head")
+
+            if humanoid and humanoid.Health > 0 and head then
+                local distance = (head.Position - Camera.CFrame.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestPlayer = {Head = head, Player = player}
+                end
+            end
+        end
+    end
+
+    return closestPlayer
+end
+
+function updateAmmo(weapon, targetHead)
+    local values = weapon:FindFirstChild("Values")
+    local hitMarker = weapon:FindFirstChild("Hitmarker")
+
+    if not values or not hitMarker then
+        return false
+    end
+
+    local ammo = values:FindFirstChild("SERVER_Ammo")           
+    local storedAmmo = values:FindFirstChild("SERVER_StoredAmmo") 
+
+    if not ammo or not storedAmmo or ammo.Value <= 0 then
+        return false
+    end
+
+    storedAmmo.Value = storedAmmo.Value
+    ammo.Value = math.max(ammo.Value - 1, 0)
+    hitMarker:Fire(targetHead)
+
+    return true
+end
+
+function createReloadEvent()
+    local tool = getCurrentWeapon()
+    if not tool then
+        return nil
+    end
+
+    local args = {
+        tick(),
+        "KLWE89U0",
+        tool
+    }
+
+    return args
+end
+
+local function findOptimalShootingPosition(startPos, targetPos, maxatt)
+    if not isWallbangEnabled() or not WallbangConfig.CheckWalls then
+        return startPos, targetPos
+    end
+    
+    local bestStartPos = startPos
+    local bestTargetPos = targetPos
+    local minWallDistance = math.huge
+    local unobstructedPositions = {}  
+    
+    for i = 1, maxatt do
+        local goldenRatio = (1 + math.sqrt(5)) / 2
+        local offset = (i - 0.5) / maxatt
+        
+        local theta = 2 * math.pi * i / goldenRatio
+        local phi = math.acos(1 - 2 * offset)
+        
+        local x = math.cos(theta) * math.sin(phi)
+        local y = math.sin(theta) * math.sin(phi)
+        local z = math.cos(phi)
+        
+        local radius = RayConfig.RandomOffset.StartMaxOffset
+        
+        local testStartPos = startPos + Vector3.new(
+            x * radius,  
+            y * radius,  
+            z * radius   
+        )
+        
+        local targetOffset = (i + 0.3) / (maxatt + 0.6)  
+        local targetTheta = 2 * math.pi * (i + 0.5) / goldenRatio
+        local targetPhi = math.acos(1 - 2 * targetOffset)
+        
+        local targetX = math.cos(targetTheta) * math.sin(targetPhi)
+        local targetY = math.sin(targetTheta) * math.sin(targetPhi)
+        local targetZ = math.cos(targetPhi)
+        
+        local targetRadius = RayConfig.RandomOffset.EndMaxOffset
+        
+        local testTargetPos = targetPos + Vector3.new(
+            targetX * targetRadius, 
+            targetY * targetRadius,  
+            targetZ * targetRadius  
+        )
+        
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+        raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+        
+        local direction = (testTargetPos - testStartPos).Unit
+        local distance = (testTargetPos - testStartPos).Magnitude
+        
+        local raycastResult = Workspace:Raycast(testStartPos, direction * distance, raycastParams)
+        
+        if not raycastResult then
+            table.insert(unobstructedPositions, {
+                startPos = testStartPos,
+                targetPos = testTargetPos
+            })
+        else
+            local hitDistance = (raycastResult.Position - testStartPos).Magnitude
+            
+            if hitDistance < minWallDistance then
+                minWallDistance = hitDistance
+                bestStartPos = testStartPos
+                bestTargetPos = testTargetPos
+            end
+        end
+    end
+    
+    if #unobstructedPositions > 0 then
+        local randomIndex = math.random(1, #unobstructedPositions)
+        return unobstructedPositions[randomIndex].startPos, unobstructedPositions[randomIndex].targetPos
+    end
+    
+    return bestStartPos, bestTargetPos
+end
+
+function createAimshotEvent()
+    local targetData = getClosestEnemy()
+    if not targetData then
+        return nil, nil
+    end
+
+    local targetHead = targetData.Head
+    local tool = getCurrentWeapon()
+    if not tool then
+        return nil, nil
+    end
+
+    local playerHead = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
+    local startPos = playerHead and playerHead.Position or Camera.CFrame.Position
+
+    local hitPosition = targetHead.Position
+
+    local targetVelocity = targetHead.Velocity or Vector3.new(0, 0, 0)
+    hitPosition = hitPosition + targetVelocity * AutoShoot.PredictionAmount
+
+    local beamStartPos = startPos
+    local beamEndPos = hitPosition
+
+    if RayConfig.RandomOffset.Enabled then
+        if isWallbangEnabled() and WallbangConfig.CheckWalls then
+            beamStartPos, beamEndPos = findOptimalShootingPosition(beamStartPos, beamEndPos, RayConfig.RandomOffset.maxatt)
+            
+            local canHit = canWallbangHit(beamStartPos, beamEndPos)
+            if not canHit then
+                return nil, nil
+            end
+        else
+            beamStartPos = beamStartPos + generateRandomOffset(RayConfig.RandomOffset.StartMaxOffset)
+            beamEndPos = beamEndPos + generateRandomOffset(RayConfig.RandomOffset.EndMaxOffset)
+        end
+    else
+        if isWallbangEnabled() and WallbangConfig.CheckWalls then
+            local canHit = canWallbangHit(beamStartPos, beamEndPos)
+            if not canHit then
+                return nil, nil
+            end
+        end
+    end
+
+    local hitDirection = (beamEndPos - beamStartPos).Unit
+    
+    if not updateAmmo(tool, targetHead) then
+        return nil, nil
+    end
+
+    createBeam(beamStartPos, beamEndPos)
+
+    local randomKey = RandomString(30) .. "0"
+
+    local args1 = {
+        tick(), 
+        randomKey, 
+        tool, 
+        "FDS9I83", 
+        beamStartPos,
+        {hitDirection}, 
+        false
+    }
+
+    local args2 = {
+        "🧈", 
+        tool, 
+        randomKey, 
+        1, 
+        targetHead, 
+        beamEndPos,
+        hitDirection
+    }
+
+    return args1, args2
+end
+
+local RagebotGroupBox = Tabs.Main:AddLeftGroupbox('Ragebot')
+
+RagebotGroupBox:AddToggle('RagebotToggle', {
+    Text = 'Ragebot',
+    Default = false,
+    Callback = function(Value)
+        AutoShoot.Enabled = Value
+    end
+})
+
+RagebotGroupBox:AddSlider('IntervalSlider', {
+    Text = 'ragebot/s',
+    Default = 0.01,
+    Min = 0.01,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(Value)
+        AutoShoot.Interval = Value
+    end
+})
+
+RagebotGroupBox:AddToggle('ReloadToggle', {
+    Text = 'Auto Reload',
+    Default = false,
+    Callback = function(Value)
+        ReloadConfig.Enabled = Value
+    end
+})
+
+RagebotGroupBox:AddToggle('HealthFilterToggle', {
+    Text = 'Check Knocks',
+    Default = false,
+    Callback = function(Value)
+        HealthFilterConfig.Enabled = Value
+    end
+})
+
+RagebotGroupBox:AddSlider('PredictionSlider', {
+    Text = 'Prediction Amount',
+    Default = 0.15,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(Value)
+        AutoShoot.PredictionAmount = Value
+    end
+})
+
+local wallbangss = Tabs.Main:AddLeftGroupbox('wallbang')
+
+wallbangss:AddToggle('WallbangToggle', {
+    Text = 'Wallbang',
+    Default = true,
+    Callback = function(Value)
+        WallbangConfig.Enabled = Value
+    end
+})
+
+wallbangss:AddSlider('idkMaxOffset', {
+    Text = 'maxatt',
+    Default = 850,
+    Min = 200,
+    Max = 3000,
+    Rounding = 0,
+    Callback = function(Value)
+        RayConfig.RandomOffset.maxatt = Value
+    end
+})
+
+wallbangss:AddSlider('StartMaxOffsetSlider', {
+    Text = 'shoot',
+    Default = 15,
+    Min = 0,
+    Max = 30,
+    Rounding = 1,
+    Callback = function(Value)
+        RayConfig.RandomOffset.StartMaxOffset = Value
+    end
+})
+
+wallbangss:AddSlider('EndMaxOffsetSlider', {
+    Text = 'hit',
+    Default = 15,
+    Min = 0,
+    Max = 30,
+    Rounding = 1,
+    Callback = function(Value)
+        RayConfig.RandomOffset.EndMaxOffset = Value
+    end
+})
+
+wallbangss:AddToggle('WallCheckToggle', {
+    Text = 'WallCheck',
+    Default = true,
+    Callback = function(Value)
+        WallbangConfig.CheckWalls = Value
+    end
+})
+
+local RaySettingsGroupBox = Tabs.Main:AddRightGroupbox('Ray Settings')
+
+RaySettingsGroupBox:AddToggle('colorToggle', {
+    Text = 'RandomRayColor',
+    Default = true,
+    Callback = function(Value)
+        RayConfig.RandomRayColor = Value
+    end
+}):AddColorPicker('ColorRay', {
+    Default = Color3.fromRGB(0, 225, 225),
+    Title = 'Raycolor',
+    Transparency = 0,
+    Callback = function(Value)
+        RayConfig.RayColor = Value
+    end
+})
+
+RaySettingsGroupBox:AddSlider('RaySizeSlider', {
+    Text = 'Ray Size',
+    Default = 1,
+    Min = 0.1,
+    Max = 5,
+    Rounding = 1,
+    Callback = function(Value)
+        RayConfig.RaySize = Value
+    end
+})
+
+RaySettingsGroupBox:AddSlider('RayDurationSlider', {
+    Text = 'Ray Duration',
+    Default = 2,
+    Min = 0.1,
+    Max = 10,
+    Rounding = 1,
+    Callback = function(Value)
+        RayConfig.RayDuration = Value
+    end
+})
+
+local PlayerListGroupBox = Tabs.Main:AddRightGroupbox('Player List')
+
+local playerNameInput = PlayerListGroupBox:AddInput('PlayerNameInput', {
+    Text = 'Player Name',
+    Default = '',
+    Placeholder = 'Enter player name',
+    Callback = function(Value)
+        PlayerListConfig.InputName = Value
+        checkInputMatches()
+    end
+})
+
+PlayerListGroupBox:AddButton('Add to Blacklist', function()
+    if PlayerListConfig.InputName ~= "" then
+        table.insert(PlayerListConfig.Blacklist, PlayerListConfig.InputName)
+        Library:Notify("Added " .. PlayerListConfig.InputName .. " to blacklist", 3)
+    end
+end)
+
+PlayerListGroupBox:AddButton('Add to Whitelist', function()
+    if PlayerListConfig.InputName ~= "" then
+        table.insert(PlayerListConfig.Whitelist, PlayerListConfig.InputName)
+        Library:Notify("Added " .. PlayerListConfig.InputName .. " to whitelist", 3)
+    end
+end)
+
+PlayerListGroupBox:AddButton('Clear Blacklist', function()
+    PlayerListConfig.Blacklist = {}
+    Library:Notify("Blacklist cleared", 3)
+end)
+
+PlayerListGroupBox:AddButton('Clear Whitelist', function()
+    PlayerListConfig.Whitelist = {}
+    Library:Notify("Whitelist cleared", 3)
+end)
+
+local espGroup = Tabs.Main2:AddLeftGroupbox('ESP')
+
+espGroup:AddToggle('espToggle', {
+    Text = 'ESP',
+    Default = true,
+    Callback = function(Value)
+        ESP.Enabled = Value
+    end
+})
+
+espGroup:AddSlider('MaxDistanceSlider', {
+    Text = 'Max Distance',
+    Default = 200,
+    Min = 50,
+    Max = 5000,
+    Rounding = 0,
+    Callback = function(Value)
+        ESP.MaxDistance = Value
+    end
+})
+
+local espSettingsGroup = Tabs.Main2:AddRightGroupbox('ESP Settings')
+
+espSettingsGroup:AddToggle('NamesToggle', {
+    Text = 'Names',
+    Default = true,
+    Callback = function(Value)
+        ESP.Drawing.Names.Enabled = Value
+    end
+})
+
+espSettingsGroup:AddToggle('DistancesToggle', {
+    Text = 'Distances',
+    Default = true,
+    Callback = function(Value)
+        ESP.Drawing.Distances.Enabled = Value
+    end
+})
+
+espSettingsGroup:AddToggle('HealthbarToggle', {
+    Text = 'Healthbar',
+    Default = true,
+    Callback = function(Value)
+        ESP.Drawing.Healthbar.Enabled = Value
+    end
+})
+
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+
+MenuGroup:AddButton('Unload', function()
+    Library:Unload()
+end)
+
+MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { 
+    Default = 'RightControl', 
+    NoUI = false, 
+    Text = 'Menu keybind' 
+})
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+
+ThemeManager:SetFolder('CCas')
+SaveManager:SetFolder('CCas')
+
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+
+setupPlayerQuitMonitoring()
+
+coroutine.wrap(function()
+    while true do
+        if AutoShoot.Enabled then
+            local currentTime = tick()
+            
+            if currentTime - AutoShoot.LastShotTime >= AutoShoot.Interval then
+                local args1, args2 = createAimshotEvent()
+                if args1 and args2 then
+                    coroutine.wrap(function()
+                        GNX_S:FireServer(unpack(args1))
+                        ZFKLF__H:FireServer(unpack(args2))
+                    end)()
+                    
+                    AutoShoot.LastShotTime = currentTime
+                end
+            end
+        end
+        
+        task.wait(0.01)
+    end
+end)()
+
+coroutine.wrap(function()
+    while true do
+        if ReloadConfig.Enabled then
+            local currentTime = tick()
+            
+            if currentTime - ReloadConfig.LastReloadTime >= ReloadConfig.Interval then
+                local args = createReloadEvent()
+                if args then
+                    coroutine.wrap(function()
+                        GNX_R:FireServer(unpack(args))
+                    end)()
+                    
+                    ReloadConfig.LastReloadTime = currentTime
+                end
+            end
+        end
+        
+        task.wait(0.01)
+    end
+end)()
+
+Library:OnUnload(function()
+    Library.Unloaded = true
+end)
+
+Library:Notify('CasCade Loaded!', 5)
