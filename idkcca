@@ -1,456 +1,469 @@
-local DesiredSpeed = 35
-local OriginalWalkspeed = 16
-local _Humanoid
-local WalkSpeedEnabled = false  
+local function setupMovementModule(CombatTab, Toggles, LocalPlayer, Camera, ReplicatedStorage, replicatedStorage, runService, player)
+    local DesiredSpeed = 35
+    local OriginalWalkspeed = 16
+    local _Humanoid
+    local WalkSpeedEnabled = false  
 
-local OriginalWalkSpeeds = {}
+    local OriginalWalkSpeeds = {}
 
-local OldNewIndex
-OldNewIndex = hookmetamethod(game, "__newindex", function(self, key, value)
-    if not checkcaller() and key == "WalkSpeed" and typeof(self) == "Instance" and self:IsA("Humanoid") then
-        
-        if not OriginalWalkSpeeds[self] then
-            OriginalWalkSpeeds[self] = value
-        end
-        
-        if WalkSpeedEnabled then
-            OriginalWalkSpeeds[self] = value
-            if value ~= DesiredSpeed then
-                return
+    local OldNewIndex
+    OldNewIndex = hookmetamethod(game, "__newindex", function(self, key, value)
+        if not checkcaller() and key == "WalkSpeed" and typeof(self) == "Instance" and self:IsA("Humanoid") then
+            
+            if not OriginalWalkSpeeds[self] then
+                OriginalWalkSpeeds[self] = value
             end
-        end
-    end
-    return OldNewIndex(self, key, value)
-end)
-
-local OldIndex
-OldIndex = hookmetamethod(game, "__index", function(self, key)
-    
-    if not checkcaller() and self == _Humanoid and key == "WalkSpeed" and WalkSpeedEnabled then
-        return DesiredSpeed
-    end
-    return OldIndex(self, key)
-end)
-
-local OldNamecall
-OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    if not checkcaller() then
-        if method == "FireServer" and (self.Name == "__DFfDD" or self.Name == "0924023902330") then
-            return wait(9000000000)
-        elseif method == "Kick" then
-            return wait(9000000000)
-        end
-    end
-    return OldNamecall(self, ...)
-end)
-
-local function applyWalkSpeedBypass()
-    WalkSpeedEnabled = true
-    
-    RunService:BindToRenderStep("WalkSpeedBypass", Enum.RenderPriority.Character.Value + 1, function()
-        if not WalkSpeedEnabled then return end
-        
-        local character = LocalPlayer.Character
-        if character then
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                _Humanoid = humanoid
-                
-                if WalkSpeedEnabled and humanoid.WalkSpeed ~= DesiredSpeed then
-                    humanoid.WalkSpeed = DesiredSpeed
+            
+            if WalkSpeedEnabled then
+                OriginalWalkSpeeds[self] = value
+                if value ~= DesiredSpeed then
+                    return
                 end
             end
         end
+        return OldNewIndex(self, key, value)
     end)
-end
 
-local function removeWalkSpeedBypass()
-    WalkSpeedEnabled = false
-    RunService:UnbindFromRenderStep("WalkSpeedBypass")
-    
-    for humanoid, originalSpeed in pairs(OriginalWalkSpeeds) do
-        if humanoid and humanoid.Parent then
-            humanoid.WalkSpeed = originalSpeed
+    local OldIndex
+    OldIndex = hookmetamethod(game, "__index", function(self, key)
+        
+        if not checkcaller() and self == _Humanoid and key == "WalkSpeed" and WalkSpeedEnabled then
+            return DesiredSpeed
         end
-    end
-    
-    OriginalWalkSpeeds = {}
-end
+        return OldIndex(self, key)
+    end)
 
-LocalPlayer.CharacterAdded:Connect(function(char)
-    repeat task.wait() until char:FindFirstChildOfClass("Humanoid")
-    if getgenv().WalkSpeedToggle then
-        applyWalkSpeedBypass()
-    end
-end)
-
-getgenv().WalkSpeedToggle = false
-
-local function toggleWalkSpeed(enabled)
-    getgenv().WalkSpeedToggle = enabled
-    if enabled then
-        applyWalkSpeedBypass()
-    else
-        removeWalkSpeedBypass()
-    end
-end
-local MovementSection = CombatTab:Section({Name = "Movement", Side = 1})
-
-MovementSection:Toggle({
-    Name = "Walkspeed", 
-    Default = false, 
-    Flag = "WalkSpeedToggle",
-    Callback = function(enabled)
-        getgenv().WalkSpeedToggle = enabled
-        if enabled then
-            toggleWalkSpeed(true)
-        else
-            toggleWalkSpeed(false)
-        end
-    end
-})
-
-MovementSection:Slider({
-    Name = "Speed", 
-    Flag = "WalkSpeedSlider", 
-    Min = 0, 
-    Default = 35, 
-    Max = 250, 
-    Suffix = "", 
-    Decimals = 1, 
-    Callback = function(val)
-        DesiredSpeed = val
-    end
-})
-
-MovementSection:Toggle({
-    Name = "Enabled Highjump", 
-    Default = false, 
-    Flag = "HighjumpToggle",
-    Callback = function(Value)
-        jumpEnabled = Value
-    end
-})
-
-MovementSection:Slider({
-    Name = "Highjump Power", 
-    Flag = "HighjumpSlider", 
-    Min = 0, 
-    Default = 13, 
-    Max = 50, 
-    Suffix = "", 
-    Decimals = 0, 
-    Callback = function(Value)
-        jumpPower = Value
-    end
-})
-
-local staminaLoop
-local function SetupInfiniteStamina()
-    local StaminaTbl = {}
-    for _, v in pairs(getgc(true)) do
-        if type(v) == "table" and rawget(v, "S") then
-            table.insert(StaminaTbl, v)
-        end
-    end
-
-    if staminaLoop then
-        staminaLoop:Disconnect()
-    end
-
-    staminaLoop = RunService.RenderStepped:Connect(function()
-        if Toggles.InfiniteStaminaToggle.Value then
-            for _, tbl in pairs(StaminaTbl) do
-                tbl.S = 100
+    local OldNamecall
+    OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        if not checkcaller() then
+            if method == "FireServer" and (self.Name == "__DFfDD" or self.Name == "0924023902330") then
+                return wait(9000000000)
+            elseif method == "Kick" then
+                return wait(9000000000)
             end
         end
+        return OldNamecall(self, ...)
     end)
-end
 
-MovementSection:Toggle({
-    Name = "Infinite Stamina", 
-    Default = false, 
-    Flag = "InfiniteStaminaToggle",
-    Tooltip = "Prevents stamina from decreasing",
-    Callback = function(Value)
-        if Value then
-            SetupInfiniteStamina()
-        elseif staminaLoop then
-            staminaLoop:Disconnect()
-            staminaLoop = nil
-        end
-    end
-})
-
-local fastPickUpEnabled = false
-local proximityPrompts = {}
-
-workspace.DescendantAdded:Connect(function(item)
-    if item:IsA("ProximityPrompt") then
-        proximityPrompts[item] = { originalDuration = item.HoldDuration }
-        item.AncestryChanged:Connect(function(_, parent)
-            if not parent then proximityPrompts[item] = nil end
+    local function applyWalkSpeedBypass()
+        WalkSpeedEnabled = true
+        
+        runService:BindToRenderStep("WalkSpeedBypass", Enum.RenderPriority.Character.Value + 1, function()
+            if not WalkSpeedEnabled then return end
+            
+            local character = LocalPlayer.Character
+            if character then
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    _Humanoid = humanoid
+                    
+                    if WalkSpeedEnabled and humanoid.WalkSpeed ~= DesiredSpeed then
+                        humanoid.WalkSpeed = DesiredSpeed
+                    end
+                end
+            end
         end)
     end
-end)
 
-RunService.RenderStepped:Connect(function()
-    for prompt, data in pairs(proximityPrompts) do
-        if prompt:IsA("ProximityPrompt") then
-            prompt.HoldDuration = fastPickUpEnabled and 0 or data.originalDuration
+    local function removeWalkSpeedBypass()
+        WalkSpeedEnabled = false
+        runService:UnbindFromRenderStep("WalkSpeedBypass")
+        
+        for humanoid, originalSpeed in pairs(OriginalWalkSpeeds) do
+            if humanoid and humanoid.Parent then
+                humanoid.WalkSpeed = originalSpeed
+            end
         end
+        
+        OriginalWalkSpeeds = {}
     end
-end)
 
-local originalFOV = Camera.FieldOfView
-getgenv().FOVChangerEnabled = false
-getgenv().DesiredFOV = originalFOV
-
---// FOV Logic
-RunService.RenderStepped:Connect(function()
-    if getgenv().FOVChangerEnabled and Camera then
-        Camera.FieldOfView = getgenv().DesiredFOV
-    else
-        Camera.FieldOfView = originalFOV
-    end
-end)
-
---// UI Elements
-MovementSection:Toggle({
-    Name = "FOV Changer", 
-    Default = false, 
-    Flag = "FOVChangerToggle",
-    Callback = function(enabled)
-        getgenv().FOVChangerEnabled = enabled
-    end
-})
-
-MovementSection:Slider({
-    Name = "FOV Value", 
-    Flag = "FOVSlider", 
-    Min = 70, 
-    Default = 90, 
-    Max = 120, 
-    Suffix = "", 
-    Decimals = 1, 
-    Callback = function(val)
-        getgenv().DesiredFOV = val
-    end
-})
-
-
-local autoRespawn = false
-local deathRespawnEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("DeathRespawn")
-
-local function checkAndRespawn()
-    while autoRespawn do
-        local character = LocalPlayer.Character
-        local humanoid = character and character:FindFirstChildWhichIsA("Humanoid")
-        if humanoid and humanoid.Health <= 0 then
-            deathRespawnEvent:InvokeServer("KMG4R904")
+    LocalPlayer.CharacterAdded:Connect(function(char)
+        repeat task.wait() until char:FindFirstChildOfClass("Humanoid")
+        if getgenv().WalkSpeedToggle then
+            applyWalkSpeedBypass()
         end
-        wait(2)
-    end
-end
+    end)
 
-local AutoSection = CombatTab:Section({Name = "Auto", Side = 1})
+    getgenv().WalkSpeedToggle = false
 
-AutoSection:Toggle({
-    Name = "Auto Respawn", 
-    Default = false, 
-    Flag = "AutoRespawnToggle",
-    Tooltip = "Respawns you when you die",
-    Callback = function(enabled)
-        autoRespawn = enabled
+    local function toggleWalkSpeed(enabled)
+        getgenv().WalkSpeedToggle = enabled
         if enabled then
-            task.spawn(checkAndRespawn)
+            applyWalkSpeedBypass()
+        else
+            removeWalkSpeedBypass()
         end
     end
-})
 
-AutoSection:Toggle({
-    Name = "Fast Pickup", 
-    Default = false, 
-    Flag = "FastPickUpToggle",
-    Tooltip = "Instant pickup items",
-    Callback = function(enabled)
-        fastPickUpEnabled = enabled
-    end
-})
+    local MovementSection = CombatTab:Section({Name = "Movement", Side = 1})
 
-local toolsFolder = workspace:WaitForChild("Filter"):WaitForChild("SpawnedTools")
-local cashFolder = workspace:WaitForChild("Filter"):WaitForChild("SpawnedBread")
-local pilesFolder = workspace:WaitForChild("Filter"):WaitForChild("SpawnedPiles")
-
-local pickupMethod = "Without Remote Event"
-local cooldown = 0.8
-local canPickup = true
-local lastPickupTime = 0
-
-local toolsEnabled, cashEnabled, scrapsEnabled, cratesEnabled = false, false, false, false
-local toolsConnection, moneyConnection, scrapsConnection, cratesConnection = nil, nil, nil, nil
-
-local function interactWithPrompt(v)
-	if v:IsA("ProximityPrompt") and canPickup then
-		v.HoldDuration = 0
-		fireproximityprompt(v)
-		canPickup = false
-		lastPickupTime = tick()
-	end
-end
-
-local function pickupWithoutRemote(v)
-	if toolsEnabled and v:IsA("Model") and toolsFolder:FindFirstChild(v.Name) then
-		for _, p in ipairs(v:GetDescendants()) do interactWithPrompt(p) end
-	elseif cashEnabled and v:IsA("BasePart") and v.Name == "CashDrop1" then
-		for _, p in ipairs(v:GetChildren()) do interactWithPrompt(p) end
-	elseif scrapsEnabled and v:IsA("Model") and (v.Name == "S1" or v.Name == "S2") then
-		for _, p in ipairs(v:GetDescendants()) do interactWithPrompt(p) end
-	elseif cratesEnabled and v:IsA("Model") and (v.Name == "C1" or v.Name == "C2" or v.Name == "C3") then
-		for _, p in ipairs(v:GetDescendants()) do interactWithPrompt(p) end
-	end
-end
-
-local function scanItems()
-	while toolsEnabled or cashEnabled or scrapsEnabled or cratesEnabled do
-		if not canPickup and tick() - lastPickupTime >= cooldown then
-			canPickup = true
-		end
-		for _, v in ipairs(toolsFolder:GetChildren()) do pickupWithoutRemote(v) end
-		for _, v in ipairs(cashFolder:GetChildren()) do pickupWithoutRemote(v) end
-		for _, v in ipairs(pilesFolder:GetChildren()) do pickupWithoutRemote(v) end
-		task.wait(0.1)
-	end
-end
-
-local function pickupRemote(folder, eventName, findCondition, posFn, cooldownTime, attrRev)
-	local remote = replicatedStorage:WaitForChild("Events"):WaitForChild(eventName)
-	local connection
-	local canPickup = true
-	local last = tick()
-
-	connection = runService.RenderStepped:Connect(function()
-		local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-		if not hrp then return end
-
-		local closest, dist = nil, 15
-		for _, item in pairs(folder:GetChildren()) do
-			if findCondition(item) then
-				local pos = posFn(item)
-				local d = (hrp.Position - pos).Magnitude
-				if d < dist then
-					closest = item
-					dist = d
-				end
-			end
-		end
-
-		if closest and canPickup then
-			if attrRev then
-				remote:FireServer(string.reverse(closest:GetAttribute(attrRev)))
-			else
-				remote:FireServer(closest:FindFirstChild("Handle") or closest:FindFirstChild("WeaponHandle") or closest)
-			end
-			canPickup = false
-		elseif tick() - last >= cooldownTime then
-			canPickup = true
-			last = tick()
-		end
-	end)
-
-	return connection
-end
-
-local PickupSection = CombatTab:Section({Name = "Auto Pickup", Side = 2})
-
-PickupSection:Toggle({
-    Name = "Auto Pickup Scraps", 
-    Default = false, 
-    Flag = "ToggleScraps",
-    Callback = function(val)
-        scrapsEnabled = val
-        if scrapsConnection then scrapsConnection:Disconnect() end
-        if val then
-            if pickupMethod == "With Remote Event" then
-                scrapsConnection = pickupRemote(pilesFolder, "PIC_PU", function(a)
-                    return a.Name == "S1" or a.Name == "S2"
-                end, function(a) return a.MeshPart.Position end, 4.5, "jzu")
+    MovementSection:Toggle({
+        Name = "Walkspeed", 
+        Default = false, 
+        Flag = "WalkSpeedToggle",
+        Callback = function(enabled)
+            getgenv().WalkSpeedToggle = enabled
+            if enabled then
+                toggleWalkSpeed(true)
             else
-                task.spawn(scanItems)
+                toggleWalkSpeed(false)
+            end
+        end
+    })
+
+    MovementSection:Slider({
+        Name = "Speed", 
+        Flag = "WalkSpeedSlider", 
+        Min = 0, 
+        Default = 35, 
+        Max = 250, 
+        Suffix = "", 
+        Decimals = 1, 
+        Callback = function(val)
+            DesiredSpeed = val
+        end
+    })
+
+    MovementSection:Toggle({
+        Name = "Enabled Highjump", 
+        Default = false, 
+        Flag = "HighjumpToggle",
+        Callback = function(Value)
+            getgenv().jumpEnabled = Value
+        end
+    })
+
+    MovementSection:Slider({
+        Name = "Highjump Power", 
+        Flag = "HighjumpSlider", 
+        Min = 0, 
+        Default = 13, 
+        Max = 50, 
+        Suffix = "", 
+        Decimals = 0, 
+        Callback = function(Value)
+            getgenv().jumpPower = Value
+        end
+    })
+
+    local staminaLoop
+    local function SetupInfiniteStamina()
+        local StaminaTbl = {}
+        for _, v in pairs(getgc(true)) do
+            if type(v) == "table" and rawget(v, "S") then
+                table.insert(StaminaTbl, v)
+            end
+        end
+
+        if staminaLoop then
+            staminaLoop:Disconnect()
+        end
+
+        staminaLoop = runService.RenderStepped:Connect(function()
+            if Toggles.InfiniteStaminaToggle.Value then
+                for _, tbl in pairs(StaminaTbl) do
+                    tbl.S = 100
+                end
+            end
+        end)
+    end
+
+    MovementSection:Toggle({
+        Name = "Infinite Stamina", 
+        Default = false, 
+        Flag = "InfiniteStaminaToggle",
+        Tooltip = "Prevents stamina from decreasing",
+        Callback = function(Value)
+            if Value then
+                SetupInfiniteStamina()
+            elseif staminaLoop then
+                staminaLoop:Disconnect()
+                staminaLoop = nil
+            end
+        end
+    })
+
+    local fastPickUpEnabled = false
+    local proximityPrompts = {}
+
+    workspace.DescendantAdded:Connect(function(item)
+        if item:IsA("ProximityPrompt") then
+            proximityPrompts[item] = { originalDuration = item.HoldDuration }
+            item.AncestryChanged:Connect(function(_, parent)
+                if not parent then proximityPrompts[item] = nil end
+            end)
+        end
+    end)
+
+    runService.RenderStepped:Connect(function()
+        for prompt, data in pairs(proximityPrompts) do
+            if prompt:IsA("ProximityPrompt") then
+                prompt.HoldDuration = fastPickUpEnabled and 0 or data.originalDuration
+            end
+        end
+    end)
+
+    local originalFOV = Camera.FieldOfView
+    getgenv().FOVChangerEnabled = false
+    getgenv().DesiredFOV = originalFOV
+
+    runService.RenderStepped:Connect(function()
+        if getgenv().FOVChangerEnabled and Camera then
+            Camera.FieldOfView = getgenv().DesiredFOV
+        else
+            Camera.FieldOfView = originalFOV
+        end
+    end)
+
+    MovementSection:Toggle({
+        Name = "FOV Changer", 
+        Default = false, 
+        Flag = "FOVChangerToggle",
+        Callback = function(enabled)
+            getgenv().FOVChangerEnabled = enabled
+        end
+    })
+
+    MovementSection:Slider({
+        Name = "FOV Value", 
+        Flag = "FOVSlider", 
+        Min = 70, 
+        Default = 90, 
+        Max = 120, 
+        Suffix = "", 
+        Decimals = 1, 
+        Callback = function(val)
+            getgenv().DesiredFOV = val
+        end
+    })
+
+    local autoRespawn = false
+    local deathRespawnEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("DeathRespawn")
+
+    local function checkAndRespawn()
+        while autoRespawn do
+            local character = LocalPlayer.Character
+            local humanoid = character and character:FindFirstChildWhichIsA("Humanoid")
+            if humanoid and humanoid.Health <= 0 then
+                deathRespawnEvent:InvokeServer("KMG4R904")
+            end
+            wait(2)
+        end
+    end
+
+    local AutoSection = CombatTab:Section({Name = "Auto", Side = 1})
+
+    AutoSection:Toggle({
+        Name = "Auto Respawn", 
+        Default = false, 
+        Flag = "AutoRespawnToggle",
+        Tooltip = "Respawns you when you die",
+        Callback = function(enabled)
+            autoRespawn = enabled
+            if enabled then
+                task.spawn(checkAndRespawn)
+            end
+        end
+    })
+
+    AutoSection:Toggle({
+        Name = "Fast Pickup", 
+        Default = false, 
+        Flag = "FastPickUpToggle",
+        Tooltip = "Instant pickup items",
+        Callback = function(enabled)
+            fastPickUpEnabled = enabled
+        end
+    })
+
+    local toolsFolder = workspace:WaitForChild("Filter"):WaitForChild("SpawnedTools")
+    local cashFolder = workspace:WaitForChild("Filter"):WaitForChild("SpawnedBread")
+    local pilesFolder = workspace:WaitForChild("Filter"):WaitForChild("SpawnedPiles")
+
+    local pickupMethod = "Without Remote Event"
+    local cooldown = 0.8
+    local canPickup = true
+    local lastPickupTime = 0
+
+    local toolsEnabled, cashEnabled, scrapsEnabled, cratesEnabled = false, false, false, false
+    local toolsConnection, moneyConnection, scrapsConnection, cratesConnection = nil, nil, nil, nil
+
+    local function interactWithPrompt(v)
+        if v:IsA("ProximityPrompt") and canPickup then
+            v.HoldDuration = 0
+            fireproximityprompt(v)
+            canPickup = false
+            lastPickupTime = tick()
+        end
+    end
+
+    local function pickupWithoutRemote(v)
+        if toolsEnabled and v:IsA("Model") and toolsFolder:FindFirstChild(v.Name) then
+            for _, p in ipairs(v:GetDescendants()) do interactWithPrompt(p) end
+        elseif cashEnabled and v:IsA("BasePart") and v.Name == "CashDrop1" then
+            for _, p in ipairs(v:GetChildren()) do interactWithPrompt(p) end
+        elseif scrapsEnabled and v:IsA("Model") and (v.Name == "S1" or v.Name == "S2") then
+            for _, p in ipairs(v:GetDescendants()) do interactWithPrompt(p) end
+        elseif cratesEnabled and v:IsA("Model") and (v.Name == "C1" or v.Name == "C2" or v.Name == "C3") then
+            for _, p in ipairs(v:GetDescendants()) do interactWithPrompt(p) end
+        end
+    end
+
+    local function scanItems()
+        while toolsEnabled or cashEnabled or scrapsEnabled or cratesEnabled do
+            if not canPickup and tick() - lastPickupTime >= cooldown then
+                canPickup = true
+            end
+            for _, v in ipairs(toolsFolder:GetChildren()) do pickupWithoutRemote(v) end
+            for _, v in ipairs(cashFolder:GetChildren()) do pickupWithoutRemote(v) end
+            for _, v in ipairs(pilesFolder:GetChildren()) do pickupWithoutRemote(v) end
+            task.wait(0.1)
+        end
+    end
+
+    local function pickupRemote(folder, eventName, findCondition, posFn, cooldownTime, attrRev)
+        local remote = replicatedStorage:WaitForChild("Events"):WaitForChild(eventName)
+        local connection
+        local canPickup = true
+        local last = tick()
+
+        connection = runService.RenderStepped:Connect(function()
+            local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+
+            local closest, dist = nil, 15
+            for _, item in pairs(folder:GetChildren()) do
+                if findCondition(item) then
+                    local pos = posFn(item)
+                    local d = (hrp.Position - pos).Magnitude
+                    if d < dist then
+                        closest = item
+                        dist = d
+                    end
+                end
+            end
+
+            if closest and canPickup then
+                if attrRev then
+                    remote:FireServer(string.reverse(closest:GetAttribute(attrRev)))
+                else
+                    remote:FireServer(closest:FindFirstChild("Handle") or closest:FindFirstChild("WeaponHandle") or closest)
+                end
+                canPickup = false
+            elseif tick() - last >= cooldownTime then
+                canPickup = true
+                last = tick()
+            end
+        end)
+
+        return connection
+    end
+
+    local PickupSection = CombatTab:Section({Name = "Auto Pickup", Side = 2})
+
+    PickupSection:Toggle({
+        Name = "Auto Pickup Scraps", 
+        Default = false, 
+        Flag = "ToggleScraps",
+        Callback = function(val)
+            scrapsEnabled = val
+            if scrapsConnection then scrapsConnection:Disconnect() end
+            if val then
+                if pickupMethod == "With Remote Event" then
+                    scrapsConnection = pickupRemote(pilesFolder, "PIC_PU", function(a)
+                        return a.Name == "S1" or a.Name == "S2"
+                    end, function(a) return a.MeshPart.Position end, 4.5, "jzu")
+                else
+                    task.spawn(scanItems)
+                end
+            end
+        end
+    })
+
+    PickupSection:Toggle({
+        Name = "Auto Pickup Tools", 
+        Default = false, 
+        Flag = "ToggleTools",
+        Callback = function(val)
+            toolsEnabled = val
+            if toolsConnection then toolsConnection:Disconnect() end
+            if val then
+                if pickupMethod == "With Remote Event" then
+                    toolsConnection = pickupRemote(toolsFolder, "PIC_TLO", function(a)
+                        return true
+                    end, function(a)
+                        local h = a:FindFirstChild("Handle") or a:FindFirstChild("WeaponHandle")
+                        return h and h.Position or Vector3.new()
+                    end, 1.5)
+                else
+                    task.spawn(scanItems)
+                end
+            end
+        end
+    })
+
+    PickupSection:Toggle({
+        Name = "Auto Pickup Cash", 
+        Default = false, 
+        Flag = "ToggleCash",
+        Callback = function(val)
+            cashEnabled = val
+            if moneyConnection then moneyConnection:Disconnect() end
+            if val then
+                if pickupMethod == "With Remote Event" then
+                    moneyConnection = pickupRemote(cashFolder, "CZDPZUS", function(a)
+                        return a:IsA("BasePart")
+                    end, function(a) return a.Position end, 0.7)
+                else
+                    task.spawn(scanItems)
+                end
+            end
+        end
+    })
+
+    getgenv().lockpickHBEEnabled = false
+
+    local function updateLockpickBars()
+        local PlayerGui = game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        if PlayerGui and PlayerGui:FindFirstChild("LockpickGUI") then
+            local frames = PlayerGui.LockpickGUI.MF.LP_Frame.Frames
+            for i = 1, 3 do
+                local Bar = frames["B" .. i].Bar
+                Bar.Size = getgenv().lockpickHBEEnabled and UDim2.new(0, 35, 0, 500) or UDim2.new(0, 35, 0, 30)
             end
         end
     end
-})
 
-PickupSection:Toggle({
-    Name = "Auto Pickup Tools", 
-    Default = false, 
-    Flag = "ToggleTools",
-    Callback = function(val)
-        toolsEnabled = val
-        if toolsConnection then toolsConnection:Disconnect() end
-        if val then
-            if pickupMethod == "With Remote Event" then
-                toolsConnection = pickupRemote(toolsFolder, "PIC_TLO", function(a)
-                    return true
-                end, function(a)
-                    local h = a:FindFirstChild("Handle") or a:FindFirstChild("WeaponHandle")
-                    return h and h.Position or Vector3.new()
-                end, 1.5)
-            else
-                task.spawn(scanItems)
-            end
+    game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui").ChildAdded:Connect(function(child)
+        if child.Name == "LockpickGUI" then
+            updateLockpickBars()
         end
-    end
-})
+    end)
 
-PickupSection:Toggle({
-    Name = "Auto Pickup Cash", 
-    Default = false, 
-    Flag = "ToggleCash",
-    Callback = function(val)
-        cashEnabled = val
-        if moneyConnection then moneyConnection:Disconnect() end
-        if val then
-            if pickupMethod == "With Remote Event" then
-                moneyConnection = pickupRemote(cashFolder, "CZDPZUS", function(a)
-                    return a:IsA("BasePart")
-                end, function(a) return a.Position end, 0.7)
-            else
-                task.spawn(scanItems)
-            end
+    local ToolsSection = CombatTab:Section({Name = "Tools", Side = 1})
+
+    ToolsSection:Toggle({
+        Name = "Auto Lockpick", 
+        Default = false, 
+        Flag = "LockpickHBEToggle",
+        Callback = function(value)
+            getgenv().lockpickHBEEnabled = value
+            updateLockpickBars()
         end
-    end
-})
+    })
 
-getgenv().lockpickHBEEnabled = false
-
-local function updateLockpickBars()
-    local PlayerGui = game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if PlayerGui and PlayerGui:FindFirstChild("LockpickGUI") then
-        local frames = PlayerGui.LockpickGUI.MF.LP_Frame.Frames
-        for i = 1, 3 do
-            local Bar = frames["B" .. i].Bar
-            Bar.Size = getgenv().lockpickHBEEnabled and UDim2.new(0, 35, 0, 500) or UDim2.new(0, 35, 0, 30)
-        end
-    end
+    return {
+        toggleWalkSpeed = toggleWalkSpeed,
+        applyWalkSpeedBypass = applyWalkSpeedBypass,
+        removeWalkSpeedBypass = removeWalkSpeedBypass,
+        SetupInfiniteStamina = SetupInfiniteStamina,
+        checkAndRespawn = checkAndRespawn,
+        scanItems = scanItems,
+        pickupRemote = pickupRemote,
+        updateLockpickBars = updateLockpickBars
+    }
 end
 
-game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui").ChildAdded:Connect(function(child)
-    if child.Name == "LockpickGUI" then
-        updateLockpickBars()
-    end
-end)
-
-local ToolsSection = CombatTab:Section({Name = "Tools", Side = 1})
-
-ToolsSection:Toggle({
-    Name = "Auto Lockpick", 
-    Default = false, 
-    Flag = "LockpickHBEToggle",
-    Callback = function(value)
-        getgenv().lockpickHBEEnabled = value
-        updateLockpickBars()
-    end
-})
+return setupMovementModule
