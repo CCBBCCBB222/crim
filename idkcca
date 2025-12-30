@@ -142,7 +142,7 @@ local function setupMovementModule(CombatTab, Toggles, LocalPlayer, Camera, Repl
         Default = 13, 
         Max = 50, 
         Suffix = "", 
-        Decimals = 0, 
+        Decimals = 1, 
         Callback = function(Value)
             jumpPower = Value
         end
