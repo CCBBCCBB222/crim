@@ -1,5 +1,5 @@
 local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, LocalPlayer, Camera, ReplicatedStorage, replicatedStorage, runService, player, UserInputService)
-    -- 移动功能变量
+    
     local DesiredSpeed = 35
     local OriginalWalkspeed = 16
     local _Humanoid
@@ -8,7 +8,6 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     local jumpEnabled = false
     local OriginalWalkSpeeds = {}
 
-    -- 高跳功能
     local function setupCharacter(character)
         local humanoid = character:WaitForChild("Humanoid")
         local rootPart = character:WaitForChild("HumanoidRootPart")
@@ -49,14 +48,12 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end)
     end
 
-    -- 初始设置角色
     if LocalPlayer.Character then
         setupCharacter(LocalPlayer.Character)
     end
     
-    -- 监听角色添加事件
     LocalPlayer.CharacterAdded:Connect(function(character)
-        wait(0.5) -- 等待角色完全加载
+        wait(0.5)
         setupCharacter(character)
     end)
 
@@ -151,7 +148,6 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     end
 
-    -- 移动功能UI
     local MovementSection = CombatTab:Section({Name = "Movement", Side = 1})
 
     MovementSection:Toggle({
@@ -281,7 +277,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
 
-    MovementSection:Slider({
+    CameraSection:Slider({
         Name = "FOV Value", 
         Flag = "FOVSlider", 
         Min = 70, 
