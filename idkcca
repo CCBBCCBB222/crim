@@ -1,5 +1,4 @@
 local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, LocalPlayer, Camera, ReplicatedStorage, replicatedStorage, runService, player, UserInputService)
-   
     local DesiredSpeed = 35
     local OriginalWalkspeed = 16
     local _Humanoid
