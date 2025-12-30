@@ -1,4 +1,5 @@
 local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, LocalPlayer, Camera, ReplicatedStorage, replicatedStorage, runService, player, UserInputService)
+    -- 移动功能变量
     local DesiredSpeed = 35
     local OriginalWalkspeed = 16
     local _Humanoid
@@ -7,7 +8,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     local jumpEnabled = false
     local OriginalWalkSpeeds = {}
 
-   
+    -- 高跳功能
     local function setupCharacter(character)
         local humanoid = character:WaitForChild("Humanoid")
         local rootPart = character:WaitForChild("HumanoidRootPart")
@@ -48,12 +49,14 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end)
     end
 
+    -- 初始设置角色
     if LocalPlayer.Character then
         setupCharacter(LocalPlayer.Character)
     end
     
+    -- 监听角色添加事件
     LocalPlayer.CharacterAdded:Connect(function(character)
-        wait(0.5) 
+        wait(0.5) -- 等待角色完全加载
         setupCharacter(character)
     end)
 
@@ -148,6 +151,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     end
 
+    -- 移动功能UI
     local MovementSection = CombatTab:Section({Name = "Movement", Side = 1})
 
     MovementSection:Toggle({
@@ -213,7 +217,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
 
         staminaLoop = runService.RenderStepped:Connect(function()
-            if Toggles.InfiniteStaminaToggle.Value then
+            if Toggles and Toggles.InfiniteStaminaToggle and Toggles.InfiniteStaminaToggle.Value then
                 for _, tbl in pairs(StaminaTbl) do
                     tbl.S = 100
                 end
@@ -244,9 +248,9 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
             proximityPrompts[item] = { originalDuration = item.HoldDuration }
             item.AncestryChanged:Connect(function(_, parent)
                 if not parent then proximityPrompts[item] = nil end
-            end
+            end)
         end
-    end
+    end)
 
     runService.RenderStepped:Connect(function()
         for prompt, data in pairs(proximityPrompts) do
@@ -505,6 +509,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
 
+    -- 主题和配置功能
     local ThemesSection = SettingsTab:Section({ Name = "Settings", Side = 1 })
 
     do
@@ -696,11 +701,15 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end})
 
         ConfigsSection:Toggle({Name = "Watermark", Flag = "Watermark", Default = false, Callback = function(Value)
-            Watermark:SetVisibility(Value)
+            if Library.Watermark then
+                Library.Watermark:SetVisibility(Value)
+            end
         end})
 
         ConfigsSection:Toggle({Name = "Keybind List", Flag = "Keybind List", Default = false, Callback = function(Value)
-            KeybindList:SetVisibility(Value)
+            if Library.KeybindList then
+                Library.KeybindList:SetVisibility(Value)
+            end
         end})
 
         ConfigsSection:Dropdown({Name = "Style", Flag = "Tweening Style", Default = "Exponential", Items = {"Linear", "Sine", "Quad", "Cubic", "Quart", "Quint", "Exponential", "Circular", "Back", "Elastic", "Bounce"}, Callback = function(Value)
