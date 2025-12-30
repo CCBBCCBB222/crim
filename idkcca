@@ -256,40 +256,6 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     end)
 
-    local originalFOV = Camera.FieldOfView
-    getgenv().FOVChangerEnabled = false
-    getgenv().DesiredFOV = originalFOV
-
-    runService.RenderStepped:Connect(function()
-        if getgenv().FOVChangerEnabled and Camera then
-            Camera.FieldOfView = getgenv().DesiredFOV
-        else
-            Camera.FieldOfView = originalFOV
-        end
-    end)
-
-    MovementSection:Toggle({
-        Name = "FOV Changer", 
-        Default = false, 
-        Flag = "FOVChangerToggle",
-        Callback = function(enabled)
-            getgenv().FOVChangerEnabled = enabled
-        end
-    })
-
-    CameraSection:Slider({
-        Name = "FOV Value", 
-        Flag = "FOVSlider", 
-        Min = 70, 
-        Default = 90, 
-        Max = 120, 
-        Suffix = "", 
-        Decimals = 1, 
-        Callback = function(val)
-            getgenv().DesiredFOV = val
-        end
-    })
-
     local autoRespawn = false
     local deathRespawnEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("DeathRespawn")
 
