@@ -131,7 +131,7 @@ local function setupMovementModule(CombatTab, Toggles, LocalPlayer, Camera, Repl
         Default = false, 
         Flag = "HighjumpToggle",
         Callback = function(Value)
-            getgenv().jumpEnabled = Value
+            jumpEnabled = Value
         end
     })
 
@@ -144,7 +144,7 @@ local function setupMovementModule(CombatTab, Toggles, LocalPlayer, Camera, Repl
         Suffix = "", 
         Decimals = 0, 
         Callback = function(Value)
-            getgenv().jumpPower = Value
+            jumpPower = Value
         end
     })
 
