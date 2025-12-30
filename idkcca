@@ -1,4 +1,4 @@
-local function setupMovementModule(CombatTab, Toggles, LocalPlayer, Camera, ReplicatedStorage, replicatedStorage, runService, player)
+local function setupMovementModule(CombatTab, Toggles, LocalPlayer, Camera, ReplicatedStorage, replicatedStorage, runService, player, UserInputService)
     local DesiredSpeed = 35
     local OriginalWalkspeed = 16
     local _Humanoid
@@ -6,46 +6,56 @@ local function setupMovementModule(CombatTab, Toggles, LocalPlayer, Camera, Repl
     local jumpPower = 14
     local jumpEnabled = false
     local OriginalWalkSpeeds = {}
-   
-local function setupCharacter(character)
-    local humanoid = character:WaitForChild("Humanoid")
-    local rootPart = character:WaitForChild("HumanoidRootPart")
-    
-    local originalJumpFunction = humanoid.Jump
-    
-    humanoid.Jump = function()
-        if not jumpEnabled or not rootPart or not rootPart.Parent then 
+
+    local function setupCharacter(character)
+        local humanoid = character:WaitForChild("Humanoid")
+        local rootPart = character:WaitForChild("HumanoidRootPart")
+
+        local originalJumpFunction = humanoid.Jump
+
+        humanoid.Jump = function()
+            if not jumpEnabled or not rootPart or not rootPart.Parent then 
+                return originalJumpFunction()
+            end
+
+            if humanoid.FloorMaterial ~= Enum.Material.Air then
+                rootPart:ApplyImpulse(Vector3.new(0, jumpPower * rootPart.AssemblyMass, 0))
+                return true 
+            end
+
             return originalJumpFunction()
         end
-        
-        if humanoid.FloorMaterial ~= Enum.Material.Air then
-            rootPart:ApplyImpulse(Vector3.new(0, jumpPower * rootPart.AssemblyMass, 0))
-            return true 
-        end
-        
-        return originalJumpFunction()
-    end
-    
-    UserInputService.JumpRequest:Connect(function()
-        if not jumpEnabled or not rootPart or not rootPart.Parent then return end
-        
-        if humanoid.FloorMaterial ~= Enum.Material.Air then
-            rootPart:ApplyImpulse(Vector3.new(0, jumpPower * rootPart.AssemblyMass, 0))
-        end
-    end)
-    
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        
-        if input.KeyCode == Enum.KeyCode.Space then
+
+        UserInputService.JumpRequest:Connect(function()
             if not jumpEnabled or not rootPart or not rootPart.Parent then return end
-            
+
             if humanoid.FloorMaterial ~= Enum.Material.Air then
                 rootPart:ApplyImpulse(Vector3.new(0, jumpPower * rootPart.AssemblyMass, 0))
             end
-        end
+        end)
+
+        UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+
+            if input.KeyCode == Enum.KeyCode.Space then
+                if not jumpEnabled or not rootPart or not rootPart.Parent then return end
+
+                if humanoid.FloorMaterial ~= Enum.Material.Air then
+                    rootPart:ApplyImpulse(Vector3.new(0, jumpPower * rootPart.AssemblyMass, 0))
+                end
+            end
+        end)
+    end
+
+    -- 初始设置角色
+    if LocalPlayer.Character then
+        setupCharacter(LocalPlayer.Character)
+    end
+    
+    LocalPlayer.CharacterAdded:Connect(function(character)
+        wait(0.5) 
+        setupCharacter(character)
     end)
-end
 
     local OldNewIndex
     OldNewIndex = hookmetamethod(game, "__newindex", function(self, key, value)
@@ -503,7 +513,8 @@ end
         checkAndRespawn = checkAndRespawn,
         scanItems = scanItems,
         pickupRemote = pickupRemote,
-        updateLockpickBars = updateLockpickBars
+        updateLockpickBars = updateLockpickBars,
+        setupCharacter = setupCharacter
     }
 end
 
