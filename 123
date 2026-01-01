@@ -1,9 +1,6 @@
-
 local FOVModule = {}
 
-function FOVModule:Init(Library, Window)
-    local CameraSection = Window:Page({Name = "Camera", Columns = 2}):Section({Name = "Camera Settings", Side = 1})
-    
+function FOVModule:Init(CameraSection)  
     local uiTransparencyData = {}
     local cam = workspace.CurrentCamera
     local originalFOV = cam.FieldOfView
