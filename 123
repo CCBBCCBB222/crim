@@ -4,16 +4,17 @@ function FOVModule:Init(CameraSection)
     local uiTransparencyData = {}
     local cam = workspace.CurrentCamera
     local originalFOV = cam.FieldOfView
+    local savedOriginalFOV = originalFOV 
     local fovSettings = {
         enabled = false,
         value = originalFOV
     }
-    
+
     local function hideUIInLevelFrame(elementNames)
         local player = game.Players.LocalPlayer
         local playerGui = player:WaitForChild("PlayerGui")
         uiTransparencyData = {}
-        
+
         local function processElement(element)
             local data = {}
             if element:IsA("GuiObject") then
@@ -34,7 +35,7 @@ function FOVModule:Init(CameraSection)
                 uiTransparencyData[element] = data
             end
         end
-        
+
         local function findLevelFrame(parent)
             for _, child in ipairs(parent:GetChildren()) do
                 if child.Name == "LevelFrame" then
@@ -47,12 +48,12 @@ function FOVModule:Init(CameraSection)
             end
             return nil
         end
-        
+
         local levelFrame = findLevelFrame(playerGui)
         if not levelFrame then
             return false
         end
-        
+
         for _, elementName in ipairs(elementNames or {"Stat", "LevelNumber", "Levelbox", "bar", "bar2", "Max", "BG"}) do
             local element = levelFrame:FindFirstChild(elementName, true)
             if element then
@@ -61,7 +62,7 @@ function FOVModule:Init(CameraSection)
         end
         return true
     end
-    
+
     local function showUIInLevelFrame()
         for guiObject, transparencyData in pairs(uiTransparencyData) do
             if guiObject and guiObject.Parent then
@@ -74,26 +75,31 @@ function FOVModule:Init(CameraSection)
         end
         uiTransparencyData = {}
     end
-    
+
+  
     game:GetService("RunService").RenderStepped:Connect(function()
         if fovSettings.enabled and cam then
+           
             cam.FieldOfView = fovSettings.value
         else
-            cam.FieldOfView = originalFOV
+           
         end
     end)
-    
+
     CameraSection:Toggle({
         Name = "FOV Changer", 
         Default = false, 
         Callback = function(e)
             fovSettings.enabled = e
             if not e and cam then
-                cam.FieldOfView = originalFOV
+             
+                cam.FieldOfView = savedOriginalFOV
+            else
+                savedOriginalFOV = cam.FieldOfView
             end
         end
     })
-    
+
     CameraSection:Slider({
         Name = "FOV Value", 
         Min = 70, 
@@ -106,7 +112,7 @@ function FOVModule:Init(CameraSection)
             end
         end
     })
-    
+
     CameraSection:Toggle({
         Name = "HideUI", 
         Default = false, 
@@ -118,7 +124,7 @@ function FOVModule:Init(CameraSection)
             end
         end
     })
-    
+
     return self
 end
 
