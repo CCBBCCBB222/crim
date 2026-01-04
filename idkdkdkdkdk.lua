@@ -1,3 +1,5 @@
+local ESPModule = {}
+
 local ESPConfig = {
     normalTransparency = 0.85,
     neonColor = Color3.fromRGB(0, 255, 255),
@@ -9,7 +11,7 @@ local ESPConfig = {
     bodyTransparency = 0.9
 }
 
-local function createPlayerESP()
+function ESPModule.createPlayerESP()
     local playerESPData = {}
     local camera = workspace.CurrentCamera
     
@@ -444,4 +446,17 @@ local function createPlayerESP()
     }
 end
 
-return createPlayerESP
+function ESPModule.getConfig()
+    return ESPConfig
+end
+
+function ESPModule.updateConfig(newConfig)
+    for key, value in pairs(newConfig) do
+        if ESPConfig[key] ~= nil then
+            ESPConfig[key] = value
+        end
+    end
+    return true
+end
+
+return ESPModule
