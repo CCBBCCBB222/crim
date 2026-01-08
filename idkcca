@@ -1,5 +1,5 @@
 local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, LocalPlayer, Camera, ReplicatedStorage, replicatedStorage, runService, player, UserInputService)
-    
+
     local DesiredSpeed = 35
     local OriginalWalkspeed = 16
     local _Humanoid
@@ -51,7 +51,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     if LocalPlayer.Character then
         setupCharacter(LocalPlayer.Character)
     end
-    
+
     LocalPlayer.CharacterAdded:Connect(function(character)
         wait(0.5)
         setupCharacter(character)
@@ -221,7 +221,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end)
     end
 
-    
+
     local fastPickUpEnabled = false
     local proximityPrompts = {}
 
@@ -256,9 +256,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     end
 
-    local AutoSection = CombatTab:Section({Name = "Auto", Side = 1})
-
-    AutoSection:Toggle({
+    MovementSection:Toggle({
         Name = "Auto Respawn", 
         Default = false, 
         Flag = "AutoRespawnToggle",
@@ -271,7 +269,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
 
-    AutoSection:Toggle({
+    MovementSection:Toggle({
         Name = "Fast Pickup", 
         Default = false, 
         Flag = "FastPickUpToggle",
@@ -364,9 +362,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         return connection
     end
 
-    local PickupSection = CombatTab:Section({Name = "Auto Pickup", Side = 2})
-
-    PickupSection:Toggle({
+    MovementSection:Toggle({
         Name = "Auto Pickup Scraps", 
         Default = false, 
         Flag = "ToggleScraps",
@@ -385,7 +381,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
 
-    PickupSection:Toggle({
+    MovementSection:Toggle({
         Name = "Auto Pickup Tools", 
         Default = false, 
         Flag = "ToggleTools",
@@ -407,7 +403,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
 
-    PickupSection:Toggle({
+    MovementSection:Toggle({
         Name = "Auto Pickup Cash", 
         Default = false, 
         Flag = "ToggleCash",
@@ -445,9 +441,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     end)
 
-    local ToolsSection = CombatTab:Section({Name = "Tools", Side = 1})
-
-    ToolsSection:Toggle({
+    MovementSection:Toggle({
         Name = "Auto Lockpick", 
         Default = false, 
         Flag = "LockpickHBEToggle",
@@ -695,4 +689,3 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
 end
 
 return setupSettingsAndMovementModule
-
