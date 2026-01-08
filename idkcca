@@ -148,9 +148,9 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     end
 
-    local MovementmSection = CombatTab:Section({Name = "Movement", Side = 1})
+    local 123idk = CombatTab:Section({Name = "Movement", Side = 1})
 
-    MovementmSection:Toggle({
+    123idk:Toggle({
         Name = "Walkspeed", 
         Default = false, 
         Flag = "WalkSpeedToggle",
@@ -164,7 +164,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
 
-    MovementmSection:Slider({
+    123idk:Slider({
         Name = "Speed", 
         Flag = "WalkSpeedSlider", 
         Min = 0, 
@@ -177,7 +177,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
 
-    MovementmSection:Toggle({
+    123idk:Toggle({
         Name = "Enabled Highjump", 
         Default = false, 
         Flag = "HighjumpToggle",
@@ -186,7 +186,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
 
-    MovementmSection:Slider({
+    123idk:Slider({
         Name = "Highjump Power", 
         Flag = "HighjumpSlider", 
         Min = 0, 
@@ -676,6 +676,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     end
 
     return {
+        MovementSection = MovementSection
         toggleWalkSpeed = toggleWalkSpeed,
         applyWalkSpeedBypass = applyWalkSpeedBypass,
         removeWalkSpeedBypass = removeWalkSpeedBypass,
