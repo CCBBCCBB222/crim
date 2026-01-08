@@ -222,7 +222,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
                     getgenv().NoClipConnection:Disconnect()
                 end
                 
-                getgenv().NoClipConnection = RunService.Stepped:Connect(function()
+                getgenv().NoClipConnection = runService.Stepped:Connect(function()
                     if getgenv().NoClipEnabled then
                         applyNoClip()
                     end
