@@ -199,6 +199,73 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
 
+    MovementSection:Toggle({
+        Name = "NoClip", 
+        Default = false, 
+        Flag = "NoClipToggle",
+        Tooltip = "Walk through walls",
+        Callback = function(enabled)
+            getgenv().NoClipEnabled = enabled
+
+            local function applyNoClip()
+                if LocalPlayer.Character then
+                    for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = not enabled
+                        end
+                    end
+                end
+            end
+
+            if enabled then
+                if getgenv().NoClipConnection then
+                    getgenv().NoClipConnection:Disconnect()
+                end
+                
+                getgenv().NoClipConnection = RunService.Stepped:Connect(function()
+                    if getgenv().NoClipEnabled then
+                        applyNoClip()
+                    end
+                end)
+                
+                applyNoClip()
+            else
+                if getgenv().NoClipConnection then
+                    getgenv().NoClipConnection:Disconnect()
+                    getgenv().NoClipConnection = nil
+                end
+                applyNoClip()
+            end
+            
+            if enabled then
+                if not getgenv().CharacterAddedConnection then
+                    getgenv().CharacterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(character)
+                        wait(1)
+                        if getgenv().NoClipEnabled then
+                            applyNoClip()
+                        end
+                    end)
+                end
+            else
+                if getgenv().CharacterAddedConnection then
+                    getgenv().CharacterAddedConnection:Disconnect()
+                    getgenv().CharacterAddedConnection = nil
+                end
+            end
+        end
+    })
+
+    LocalPlayer.CharacterAdded:Connect(function(character)
+        wait(1)
+        if getgenv().NoClipEnabled then
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+
     local staminaLoop
     local function SetupInfiniteStamina()
         local StaminaTbl = {}
@@ -220,7 +287,6 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
             end
         end)
     end
-
 
     local fastPickUpEnabled = false
     local proximityPrompts = {}
@@ -451,7 +517,6 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
 
-    -- 主题和配置功能
     local ThemesSection = SettingsTab:Section({ Name = "Settings", Side = 1 })
 
     do
@@ -483,7 +548,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
 
             task.wait(0.3)
 
-            Library:Thread(function() -- i do this because sometimes the themes dont update
+            Library:Thread(function()
                 for Index, Value in Library.Theme do 
                     Library.Theme[Index] = Library.Flags["Theme"..Index].Color
                     Library:ChangeTheme(Index, Library.Flags["Theme"..Index].Color)
