@@ -148,7 +148,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     end
 
-    local MovementSection = CombatTab:Section({Name = "Movement", Side = 1})
+    local MovementSection = CombatTab:Section({Name = "Misc", Side = 1})
 
     MovementSection:Toggle({
         Name = "Walkspeed", 
