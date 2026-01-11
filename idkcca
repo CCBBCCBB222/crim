@@ -169,7 +169,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     Mode = "Toggle",
     Callback = function(Value)
             getgenv().WalkSpeedToggle = Value
-            if enabled then
+            if Value then
                 toggleWalkSpeed(true)
             else
                 toggleWalkSpeed(false)
@@ -280,7 +280,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     Default = Enum.KeyCode.I,  -- 默认快捷键H
     Mode = "Toggle",
     Callback = function(Value)
-        getgenv().NoClipEnabled = enabled
+        getgenv().NoClipEnabled = Value
 
             local function applyNoClip()
                 if LocalPlayer.Character then
@@ -292,7 +292,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
                 end
             end
 
-            if enabled then
+            if Value then
                 if getgenv().NoClipConnection then
                     getgenv().NoClipConnection:Disconnect()
                 end
@@ -312,7 +312,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
                 applyNoClip()
             end
 
-            if enabled then
+            if Value then
                 if not getgenv().CharacterAddedConnection then
                     getgenv().CharacterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(character)
                         wait(1)
