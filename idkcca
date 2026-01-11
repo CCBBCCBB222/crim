@@ -162,7 +162,20 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
                 toggleWalkSpeed(false)
             end
         end
-    })
+    }):Keybind({
+    Name = "speed",
+    Flag = "speedkey",
+    Default = Enum.KeyCode.T, 
+    Mode = "Toggle",
+    Callback = function(Value)
+            getgenv().WalkSpeedToggle = enabled
+            if enabled then
+                toggleWalkSpeed(true)
+            else
+                toggleWalkSpeed(false)
+            end
+    end
+})
 
     MovementSection:Slider({
         Name = "Speed", 
@@ -184,7 +197,15 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         Callback = function(Value)
             jumpEnabled = Value
         end
-    })
+    }):Keybind({
+    Name = "Highjump",
+    Flag = "HighjumpKeybind",
+    Default = Enum.KeyCode.Y,  -- 默认快捷键H
+    Mode = "Toggle",
+    Callback = function(Value)
+        jumpEnabled = Value
+    end
+})
 
     MovementSection:Slider({
         Name = "Highjump Power", 
@@ -253,7 +274,15 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
                 end
             end
         end
-    })
+    }):Keybind({
+    Name =  "noclip",
+    Flag = "nocilpKeybind",
+    Default = Enum.KeyCode.I,  -- 默认快捷键H
+    Mode = "Toggle",
+    Callback = function(Value)
+        getgenv().NoClipEnabled = Value
+    end
+})
 
     LocalPlayer.CharacterAdded:Connect(function(character)
         wait(1)
