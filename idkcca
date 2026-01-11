@@ -150,7 +150,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
 
     local MovementSection = CombatTab:Section({Name = "Misc", Side = 1})
 
-    MovementSection:Toggle({
+    local walkspeedToggle = MovementSection:Toggle({
         Name = "Walkspeed", 
         Default = false, 
         Flag = "WalkSpeedToggle",
@@ -162,13 +162,16 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
                 toggleWalkSpeed(false)
             end
         end
-    }):Keybind({
+    })
+    
+    walkspeedToggle:Keybind({
     Name = "speed",
     Flag = "speedkey",
     Default = Enum.KeyCode.T, 
     Mode = "Toggle",
     Callback = function(Value)
             getgenv().WalkSpeedToggle = Value
+            walkspeedToggle:Set(Value)
             if Value then
                 toggleWalkSpeed(true)
             else
@@ -190,20 +193,23 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
 
-    MovementSection:Toggle({
+    local HighjumpToggle = MovementSection:Toggle({
         Name = "Enabled Highjump", 
         Default = false, 
         Flag = "HighjumpToggle",
         Callback = function(Value)
             jumpEnabled = Value
         end
-    }):Keybind({
+    })
+
+    HighjumpToggle:Keybind({
     Name = "Highjump",
     Flag = "HighjumpKeybind",
-    Default = Enum.KeyCode.Y,  -- 默认快捷键H
+    Default = Enum.KeyCode.Y,  
     Mode = "Toggle",
     Callback = function(Value)
         jumpEnabled = Value
+        HighjumpToggle:Set(Value)
     end
 })
 
@@ -220,7 +226,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
     
-    MovementSection:Toggle({
+    local noclipToggle = MovementSection:Toggle({
         Name = "NoClip", 
         Default = false, 
         Flag = "NoClipToggle",
@@ -273,12 +279,15 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
                 end
             end
         end
-    }):Keybind({
+    })
+    
+    noclipToggle:Keybind({
     Name =  "noclip",
     Flag = "nocilpKeybind",
-    Default = Enum.KeyCode.I,  -- 默认快捷键H
+    Default = Enum.KeyCode.I, 
     Mode = "Toggle",
     Callback = function(enabled)
+            noclipToggle:Set(enabled)
             getgenv().NoClipEnabled = enabled
             local function applyNoClip()
                 if LocalPlayer.Character then
