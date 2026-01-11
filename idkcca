@@ -279,8 +279,8 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     Flag = "nocilpKeybind",
     Default = Enum.KeyCode.I,  -- 默认快捷键H
     Mode = "Toggle",
-    Callback = function(Value)
-        getgenv().NoClipEnabled = Value
+    Callback = function(enabled)
+        getgenv().NoClipEnabled = enabled
 
             local function applyNoClip()
                 if LocalPlayer.Character then
@@ -292,7 +292,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
                 end
             end
 
-            if Value then
+            if enabled then
                 if getgenv().NoClipConnection then
                     getgenv().NoClipConnection:Disconnect()
                 end
@@ -312,7 +312,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
                 applyNoClip()
             end
 
-            if Value then
+            if enabled then
                 if not getgenv().CharacterAddedConnection then
                     getgenv().CharacterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(character)
                         wait(1)
@@ -328,7 +328,6 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
                 end
             end
         end
-    end
 })
 
     LocalPlayer.CharacterAdded:Connect(function(character)
