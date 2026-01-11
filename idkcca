@@ -219,7 +219,9 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
             jumpPower = Value
         end
     })
-
+    
+    getgenv().NoClipEnabled = false
+    
     MovementSection:Toggle({
         Name = "NoClip", 
         Default = false, 
@@ -227,7 +229,6 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         Tooltip = "Walk through walls",
         Callback = function(enabled)
             getgenv().NoClipEnabled = enabled
-
             local function applyNoClip()
                 if LocalPlayer.Character then
                     for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
