@@ -168,7 +168,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     Default = Enum.KeyCode.T, 
     Mode = "Toggle",
     Callback = function(Value)
-            getgenv().WalkSpeedToggle = enabled
+            getgenv().WalkSpeedToggle = Value
             if enabled then
                 toggleWalkSpeed(true)
             else
@@ -242,13 +242,13 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
                 if getgenv().NoClipConnection then
                     getgenv().NoClipConnection:Disconnect()
                 end
-                
+
                 getgenv().NoClipConnection = runService.Stepped:Connect(function()
                     if getgenv().NoClipEnabled then
                         applyNoClip()
                     end
                 end)
-                
+
                 applyNoClip()
             else
                 if getgenv().NoClipConnection then
@@ -257,7 +257,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
                 end
                 applyNoClip()
             end
-            
+
             if enabled then
                 if not getgenv().CharacterAddedConnection then
                     getgenv().CharacterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(character)
@@ -280,7 +280,54 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     Default = Enum.KeyCode.I,  -- 默认快捷键H
     Mode = "Toggle",
     Callback = function(Value)
-        getgenv().NoClipEnabled = Value
+        getgenv().NoClipEnabled = enabled
+
+            local function applyNoClip()
+                if LocalPlayer.Character then
+                    for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = not enabled
+                        end
+                    end
+                end
+            end
+
+            if enabled then
+                if getgenv().NoClipConnection then
+                    getgenv().NoClipConnection:Disconnect()
+                end
+
+                getgenv().NoClipConnection = runService.Stepped:Connect(function()
+                    if getgenv().NoClipEnabled then
+                        applyNoClip()
+                    end
+                end)
+
+                applyNoClip()
+            else
+                if getgenv().NoClipConnection then
+                    getgenv().NoClipConnection:Disconnect()
+                    getgenv().NoClipConnection = nil
+                end
+                applyNoClip()
+            end
+
+            if enabled then
+                if not getgenv().CharacterAddedConnection then
+                    getgenv().CharacterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(character)
+                        wait(1)
+                        if getgenv().NoClipEnabled then
+                            applyNoClip()
+                        end
+                    end)
+                end
+            else
+                if getgenv().CharacterAddedConnection then
+                    getgenv().CharacterAddedConnection:Disconnect()
+                    getgenv().CharacterAddedConnection = nil
+                end
+            end
+        end
     end
 })
 
