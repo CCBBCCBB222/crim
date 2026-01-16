@@ -370,29 +370,33 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end)
     end
 
-    local fastPickUpEnabled = false
-    local proximityPrompts = {}
+    fastPickupEnabled = false
 
-    workspace.DescendantAdded:Connect(function(item)
-     if item:IsA("ProximityPrompt") then
-        proximityPrompts[item] = { originalDuration = item.HoldDuration }
-        
-        -- 根据当前状态立即设置
-        if fastPickUpEnabled then
-            item.HoldDuration = 0
-        end
-        
-        item.AncestryChanged:Connect(function(_, parent)
-            if not parent then 
-                proximityPrompts[item] = nil 
-            end
-        end)
-     end
-end)
+function bypassProximityPrompts()
+	for _, v in pairs(workspace:GetDescendants()) do
+		if v:IsA("ProximityPrompt") then
+			v.HoldDuration = 0
+		end
+	end
+end
+
+function enableBypass()
+	fastPickupEnabled = true
+	bypassProximityPrompts()
+	game:GetService("ProximityPromptService").PromptButtonHoldBegan:Connect(function(v)
+		if fastPickupEnabled then
+			v.HoldDuration = 0
+		end
+	end)
+end
+
+function disableBypass()
+	fastPickupEnabled = false
+end
 
 local function setFastPickUpEnabled(enabled)
     fastPickUpEnabled = enabled
-    
+
     for prompt, data in pairs(proximityPrompts) do
         if prompt:IsA("ProximityPrompt") then
             prompt.HoldDuration = enabled and 0 or data.originalDuration
@@ -433,8 +437,12 @@ end
         Flag = "FastPickUpToggle",
         Tooltip = "Instant pickup items",
         Callback = function(enabled)
-            fastPickUpEnabled = enabled
-        end
+            if Value then
+			    enableBypass()
+		    else
+			    disableBypass()
+		    end
+	    end
     })
 
     local toolsFolder = workspace:WaitForChild("Filter"):WaitForChild("SpawnedTools")
