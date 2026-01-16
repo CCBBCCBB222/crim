@@ -163,7 +163,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
             end
         end
     })
-    
+
     walkspeedToggle:Keybind({
     Name = "speed",
     Flag = "speedkey",
@@ -225,7 +225,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
             jumpPower = Value
         end
     })
-    
+
     local noclipToggle = MovementSection:Toggle({
         Name = "NoClip", 
         Default = false, 
@@ -280,7 +280,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
             end
         end
     })
-    
+
     noclipToggle:Keybind({
     Name =  "noclip",
     Flag = "nocilpKeybind",
@@ -374,21 +374,31 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     local proximityPrompts = {}
 
     workspace.DescendantAdded:Connect(function(item)
-        if item:IsA("ProximityPrompt") then
-            proximityPrompts[item] = { originalDuration = item.HoldDuration }
-            item.AncestryChanged:Connect(function(_, parent)
-                if not parent then proximityPrompts[item] = nil end
-            end)
+     if item:IsA("ProximityPrompt") then
+        proximityPrompts[item] = { originalDuration = item.HoldDuration }
+        
+        -- 根据当前状态立即设置
+        if fastPickUpEnabled then
+            item.HoldDuration = 0
         end
-    end)
-
-    runService.RenderStepped:Connect(function()
-        for prompt, data in pairs(proximityPrompts) do
-            if prompt:IsA("ProximityPrompt") then
-                prompt.HoldDuration = fastPickUpEnabled and 0 or data.originalDuration
+        
+        item.AncestryChanged:Connect(function(_, parent)
+            if not parent then 
+                proximityPrompts[item] = nil 
             end
+        end)
+     end
+end)
+
+local function setFastPickUpEnabled(enabled)
+    fastPickUpEnabled = enabled
+    
+    for prompt, data in pairs(proximityPrompts) do
+        if prompt:IsA("ProximityPrompt") then
+            prompt.HoldDuration = enabled and 0 or data.originalDuration
         end
-    end)
+    end
+end
 
     local autoRespawn = false
     local deathRespawnEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("DeathRespawn")
