@@ -11,6 +11,28 @@ local ESPConfig = {
     bodyTransparency = 0.9
 }
 
+function getNeonColor(player)
+    
+    local playerName = player.Name:lower()
+    local playerDisplayName = player.DisplayName:lower()
+    
+    for _, name in ipairs(PlayerListConfig.Whitelist) do
+        local lowerName = name:lower()
+        if playerName:find(lowerName) or playerDisplayName:find(lowerName) then
+            return ESP.idk.whitelistcolor
+        end
+    end
+    
+    for _, name in ipairs(PlayerListConfig.Blacklist) do
+        local lowerName = name:lower()
+        if playerName:find(lowerName) or playerDisplayName:find(lowerName) then
+            return ESP.idk.blacklistcolor  
+        end
+    end
+    
+    return ESPConfig.neonColor
+end
+
 function ESPModule.createPlayerESP()
     local playerESPData = {}
     local camera = workspace.CurrentCamera
@@ -174,6 +196,8 @@ function ESPModule.createPlayerESP()
                 if part and part:IsA("BasePart") then
                     local originalTransparency = part.Transparency
                     
+                    local dynamicNeonColor = getNeonColor(plr)
+                    
                     local highlight
                     if ESPConfig.showBox then
                         highlight = Instance.new("BoxHandleAdornment")
@@ -182,7 +206,7 @@ function ESPModule.createPlayerESP()
                         highlight.AlwaysOnTop = true
                         highlight.ZIndex = 10
                         highlight.Size = part.Size
-                        highlight.Color3 = ESPConfig.neonColor
+                        highlight.Color3 = dynamicNeonColor
                         highlight.Transparency = ESPConfig.normalTransparency
                         highlight.Parent = part
                     end
