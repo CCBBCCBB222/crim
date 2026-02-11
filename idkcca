@@ -746,7 +746,7 @@ end
             Name = "Load Config",
             Callback = function()
                 if SelectedConfig then
-                    Library:LoadConfig(readfile(Library.Folders.Configs .. "/" .. SelectedConfig))
+                    Library:LoadConfig(readfile( .. "/" .. SelectedConfig))
                 end
 
                 Library:Thread(function()
