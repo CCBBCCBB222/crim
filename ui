@@ -67,18 +67,20 @@ local Library do
 
         Folders = {
             Directory = "testpath",
-            Configs = "",
+            Configs = "Configs",
             Assets = "testpath/Assets",
             Themes = "testpath/Themes"
         },
-
+        
+        /storage/emulated/0/Android/data/com.roblox.client/files/gloop/external/Workspace/testpath/Configs/
+        
         Images = {
             ["Saturation"] = {"Saturation.png", "https://github.com/sametexe001/images/blob/main/saturation.png?raw=true" },
             ["Value"] = { "Value.png", "https://github.com/sametexe001/images/blob/main/value.png?raw=true" },
             ["Hue"] = { "Hue.png", "https://github.com/sametexe001/images/blob/main/horizontalhue.png?raw=true" },
             ["Checkers"] = { "Checkers.png", "https://github.com/sametexe001/images/blob/main/checkers.png?raw=true" },
         },
-        
+
         Pages = { },
         Sections = { },
 
@@ -89,7 +91,7 @@ local Library do
         ThemeItems = { },
 
         Themes = { },
-        
+
         CurrentFrames = { },
 
         ThemeColorpickers = { },
@@ -182,7 +184,7 @@ local Library do
     }
 
     Library.__index = Library
-    
+
     Library.Pages.__index = Library.Pages
     Library.Sections.__index = Library.Sections
 
@@ -437,18 +439,18 @@ local Library do
             local ResizeMax = Gui.Parent.AbsoluteSize - Gui.AbsoluteSize
 
             local ResizeButton = Instances:Create("TextButton", {
-				Parent = Gui,
-				AnchorPoint = Vector2New(1, 1),
-				BorderColor3 = FromRGB(0, 0, 0),
-				Size = UDim2New(0, 8, 0, 8),
-				Position = UDim2New(1, 0, 1, 0),
+                                Parent = Gui,
+                                AnchorPoint = Vector2New(1, 1),
+                                BorderColor3 = FromRGB(0, 0, 0),
+                                Size = UDim2New(0, 8, 0, 8),
+                                Position = UDim2New(1, 0, 1, 0),
                 Name = "\0",
-				BorderSizePixel = 0,
-				BackgroundTransparency = 1,
-				AutoButtonColor = false,
+                                BorderSizePixel = 0,
+                                BackgroundTransparency = 1,
+                                AutoButtonColor = false,
                 Visible = true,
                 Text = ""
-			})
+                        })
 
             ResizeButton:Connect("InputBegan", function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
@@ -466,12 +468,12 @@ local Library do
 
             Library:Connect(UserInputService.InputChanged, function(Input)
                 if (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) and Resizing then
-					ResizeMax = Maximum or Gui.Parent.AbsoluteSize - Gui.AbsoluteSize
+                                        ResizeMax = Maximum or Gui.Parent.AbsoluteSize - Gui.AbsoluteSize
 
-					Delta = Start + UDim2New(0, Input.Position.X, 0, Input.Position.Y)
-					Delta = UDim2New(0, math.clamp(Delta.X.Offset, Minimum.X, ResizeMax.X), 0, math.clamp(Delta.Y.Offset, Minimum.Y, ResizeMax.Y))
+                                        Delta = Start + UDim2New(0, Input.Position.X, 0, Input.Position.Y)
+                                        Delta = UDim2New(0, math.clamp(Delta.X.Offset, Minimum.X, ResizeMax.X), 0, math.clamp(Delta.Y.Offset, Minimum.Y, ResizeMax.Y))
 
-					Tween:Create(Gui, TweenInfo.new(0.17, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = Delta}, true)
+                                        Tween:Create(Gui, TweenInfo.new(0.17, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = Delta}, true)
                 end
             end)
 
@@ -482,7 +484,7 @@ local Library do
             if not self.Instance then 
                 return
             end
-            
+
             return Library:Connect(self.Instance.MouseEnter, Function)
         end
 
@@ -490,7 +492,7 @@ local Library do
             if not self.Instance then 
                 return
             end
-            
+
             return Library:Connect(self.Instance.MouseLeave, Function)
         end
 
@@ -683,7 +685,7 @@ local Library do
 
     Library.Thread = function(self, Function)
         local NewThread = coroutine.create(Function)
-        
+
         coroutine.wrap(function()
             coroutine.resume(NewThread)
         end)()
@@ -692,7 +694,7 @@ local Library do
 
         return NewThread
     end
-    
+
     Library.SafeCall = function(self, Function, ...)
         local Arguements = { ... }
         local Success, Result = pcall(Function, TableUnpack(Arguements))
@@ -816,31 +818,40 @@ local Library do
         end
     end
 
-    Library.RefreshConfigsList = function(self, Element)
-        local CurrentList = { }
-        local List = { }
-
-        local ConfigFolderName = StringGSub(Library.Folders.Configs, Library.Folders.Directory .. "/", "")
-
-        for Index, Value in listfiles(Library.Folders.Configs) do
-            local FileName = StringGSub(Value, Library.Folders.Directory .. "\\" .. ConfigFolderName .. "\\", "")
-            List[Index] = FileName
+  Library.RefreshConfigsList = function(self, Element)
+    local CurrentList = {}
+    local List = {}
+    
+    -- 直接获取配置文件，不进行复杂的路径替换
+    for _, filePath in listfiles(Library.Folders.Configs) do
+        -- 使用更简单的方法提取文件名
+        local fileName = filePath:match("[^\\/]+$")  -- 提取文件名部分
+        if fileName and fileName:sub(-5) == ".json" then  -- 确保是json文件
+            table.insert(List, fileName)
         end
-
-        local IsNew = #List ~= CurrentList
-
-        if not IsNew then
-            for Index = 1, #List do
-                if List[Index] ~= CurrentList[Index] then
-                    IsNew = true
-                    break
-                end
+    end
+    
+    -- 排序列表
+    table.sort(List)
+    
+    local IsNew = #List ~= #CurrentList
+    
+    if not IsNew then
+        for i = 1, #List do
+            if List[i] ~= CurrentList[i] then
+                IsNew = true
+                break
             end
-        else
-            CurrentList = List
+        end
+    end
+    
+    if IsNew then
+        CurrentList = List
+        if Element and Element.Refresh then
             Element:Refresh(CurrentList)
         end
     end
+  end
 
     Library.GetTheme = function(self)
         local Theme = { } 
@@ -1168,7 +1179,7 @@ end
                 Padding = UDimNew(0, 2),
                 SortOrder = Enum.SortOrder.LayoutOrder
             }) 
-            
+
             Instances:Create("UIPadding", {
                 Parent = Items["Content"].Instance,
                 PaddingBottom = UDimNew(0, 7),
@@ -1331,7 +1342,7 @@ end
 
         Library:Thread(function()
             Items["Notification"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {BackgroundTransparency = 0, Size = UDim2New(0, 0, 0, 24)})
-            
+
             task.wait(0.06)
 
             for Index, Value in Items["Notification"].Instance:GetDescendants() do
@@ -2338,7 +2349,7 @@ end
 
                 for Index, Value in Option do 
                     local OptionData = Dropdown.Options[Value]
-                    
+
                     if not OptionData then 
                         return
                     end
@@ -2633,12 +2644,12 @@ end
                 local MaxButtonsAdded = 5
 
                 local Column = Index % MaxButtonsAdded
-            
+
                 local ButtonSize = Items["ColorpickerButton"].Instance.AbsoluteSize
                 local Spacing = 4
-            
+
                 local XPosition = (ButtonSize.X + Spacing) * Column - Spacing - 25
-            
+
                 Items["ColorpickerButton"].Instance.Position = UDim2New(1, -XPosition, 0.5, 0)
             end
 
@@ -3062,7 +3073,7 @@ end
         local SlidingPalette = false
         local SlidingHue = false
         local SlidingAlpha = false 
-        
+
         local Debounce = false 
 
         function Colorpicker:Set(Color, Alpha)
@@ -3091,7 +3102,7 @@ end
             local AlphaPositionX = MathClamp(Colorpicker.Alpha, 0, 0.994)
 
             Items["AlphaDragger"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(AlphaPositionX, 0, 0, 0)})
-            
+
             Colorpicker:Update(true)
         end
 
@@ -3196,7 +3207,7 @@ end
 
             Items["PaletteDragger"]:Tween(TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(SlideX, 0, SlideY, 0)})
             Colorpicker:Update()        
-            
+
             OldColor = Colorpicker.Color
         end
 
@@ -3223,7 +3234,7 @@ end
             end
 
             local ValueX = MathClamp((Input.Position.X - Items["Alpha"].Instance.AbsolutePosition.X) / Items["Alpha"].Instance.AbsoluteSize.X, 0, 1)
-            
+
             Colorpicker.Alpha = ValueX
 
             OldAlpha = Colorpicker.Alpha
@@ -3549,7 +3560,7 @@ end
 
                     Value.ZIndex = 17
                 end
-                
+
                 Items["KeybindWindow"]["Outline"].Instance.ZIndex = 1
                 Items["KeybindWindow"]["Outline"].Instance.Visible = false
                 Debounce = false
@@ -3573,7 +3584,7 @@ end
                     Key = Keybind.Key,
                     Toggled = Keybind.Toggled
                 }
-    
+
                 if Data.Callback then 
                     Library:SafeCall(Data.Callback, Keybind.Toggled)
                 end
@@ -3581,7 +3592,7 @@ end
                 Update()
            elseif TableFind({"Toggle", "Hold", "Always"}, Key) then 
                 Keybind.Mode = Key
-                
+
                 Keybind:SetMode(Key)
 
                 if Data.Callback then 
@@ -3944,7 +3955,7 @@ end
 
                 for Index, Value in Option do 
                     local OptionData = Listbox.Options[Value]
-                    
+
                     if not OptionData then 
                         return
                     end
@@ -4296,7 +4307,7 @@ end
         function Page:Column(ColumnIndex)
             NewPage:Column(ColumnIndex)
         end
-        
+
         Page.Items = Items
         return setmetatable(Page, Library.Pages)
     end
@@ -4478,7 +4489,7 @@ end
                 TextSize = 12,
                 BackgroundColor3 = FromRGB(255, 255, 255)
             })  Items["UserID"]:AddToTheme({TextColor3 = "Text"})
-            
+
             Items["UserID"].Instance.Text = ""
             Items["Username"].Instance.Text = ""
 
@@ -4533,7 +4544,7 @@ end
             if Playerlist.Players[Name] then
                 Playerlist.Players[Name].PlayerButton:Clean()
             end
-            
+
             Playerlist.Players[Name] = nil
         end
 
@@ -5048,7 +5059,7 @@ end
 
             Count = 0
         }
-        
+
         local Items = Components.Label({
             Text = Label.Name,
             Parent = Label.Section.Items["Content"],
