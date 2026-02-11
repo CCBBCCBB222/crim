@@ -72,7 +72,7 @@ local Library do
             Themes = "testpath/Themes"
         },
         
-        /storage/emulated/0/Android/data/com.roblox.client/files/gloop/external/Workspace/testpath/Configs/
+     
         
         Images = {
             ["Saturation"] = {"Saturation.png", "https://github.com/sametexe001/images/blob/main/saturation.png?raw=true" },
