@@ -72,7 +72,6 @@ local Library do
             Themes = "testpath/Themes"
         },
         
-     
         
         Images = {
             ["Saturation"] = {"Saturation.png", "https://github.com/sametexe001/images/blob/main/saturation.png?raw=true" },
@@ -818,40 +817,31 @@ local Library do
         end
     end
 
-  Library.RefreshConfigsList = function(self, Element)
-    local CurrentList = {}
-    local List = {}
-    
-    -- 直接获取配置文件，不进行复杂的路径替换
-    for _, filePath in listfiles(Library.Folders.Configs) do
-        -- 使用更简单的方法提取文件名
-        local fileName = filePath:match("[^\\/]+$")  -- 提取文件名部分
-        if fileName and fileName:sub(-5) == ".json" then  -- 确保是json文件
-            table.insert(List, fileName)
+    Library.RefreshConfigsList = function(self, Element)
+        local CurrentList = { }
+        local List = { }
+
+        local ConfigFolderName = StringGSub(Library.Folders.Configs, Library.Folders.Directory .. "/", "")
+
+        for Index, Value in listfiles(Library.Folders.Configs) do
+            local FileName = StringGSub(Value, Library.Folders.Directory .. "\\" .. ConfigFolderName .. "\\", "")
+            List[Index] = FileName
         end
-    end
-    
-    -- 排序列表
-    table.sort(List)
-    
-    local IsNew = #List ~= #CurrentList
-    
-    if not IsNew then
-        for i = 1, #List do
-            if List[i] ~= CurrentList[i] then
-                IsNew = true
-                break
+
+        local IsNew = #List ~= CurrentList
+
+        if not IsNew then
+            for Index = 1, #List do
+                if List[Index] ~= CurrentList[Index] then
+                    IsNew = true
+                    break
+                end
             end
-        end
-    end
-    
-    if IsNew then
-        CurrentList = List
-        if Element and Element.Refresh then
+        else
+            CurrentList = List
             Element:Refresh(CurrentList)
         end
     end
-  end
 
     Library.GetTheme = function(self)
         local Theme = { } 
