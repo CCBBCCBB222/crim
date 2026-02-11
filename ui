@@ -67,7 +67,7 @@ local Library do
 
         Folders = {
             Directory = "testpath",
-            Configs = "Workspace/testpath/Configs/",
+            Configs = "",
             Assets = "testpath/Assets",
             Themes = "testpath/Themes"
         },
