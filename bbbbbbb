@@ -260,7 +260,7 @@ noclipToggle:Keybind({
     Default = Enum.KeyCode.I, 
     Mode = "Toggle",
     Callback = function(v)
-        noclipToggle:Set(enabled)
+        noclipToggle:Set(v)
         noclip = v
         
         if v then
@@ -285,8 +285,6 @@ noclipToggle:Keybind({
     end
 })
 
-
--- 角色重生时重新应用Noclip设置
 game.Players.LocalPlayer.CharacterAdded:Connect(function(character)
     wait(0.5) -- 等待角色完全加载
     
@@ -299,44 +297,6 @@ game.Players.LocalPlayer.CharacterAdded:Connect(function(character)
         end
     end
 end)
-
-
--- 角色重生时重新应用Noclip设置
-game.Players.LocalPlayer.CharacterAdded:Connect(function(character)
-    wait(0.5) -- 等待角色完全加载
-    
-    if noclip and not noclipConn then
-        -- 重新开启Noclip
-        noclipConn = game:GetService("RunService").Stepped:Connect(function()
-            if game.Players.LocalPlayer.Character then
-                for _, p in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
-                    if p:IsA("BasePart") then 
-                        p.CanCollide = false 
-                    end
-                end
-            end
-        end)
-    elseif not noclip then
-        -- 如果Noclip是关闭状态，确保碰撞为true
-        for _, p in pairs(character:GetDescendants()) do
-            if p:IsA("BasePart") then 
-                p.CanCollide = true 
-            end
-        end
-    end
-end)
-
-
-    LocalPlayer.CharacterAdded:Connect(function(character)
-        wait(1)
-        if getgenv().NoClipEnabled then
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end
-    end)
 
     local staminaLoop
     local function SetupInfiniteStamina()
