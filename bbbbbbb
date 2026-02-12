@@ -226,6 +226,74 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
 
+local noclip = false
+local noclipConn
+
+noclipToggle = MovementSection:Toggle({
+    Name = "Noclip", 
+    Default = false,
+    Callback = function(v)
+        noclip = v
+        if noclipConn then noclipConn:Disconnect() end
+        if v then
+            noclipConn = game:GetService("RunService").Stepped:Connect(function()
+                if game.Players.LocalPlayer.Character then
+                    for _, p in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                        if p:IsA("BasePart") then p.CanCollide = false end
+                    end
+                end
+            end)
+        else
+            if game.Players.LocalPlayer.Character then
+                for _, p in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                    if p:IsA("BasePart") then p.CanCollide = true end
+                end
+            end
+        end
+    end
+})
+
+
+noclipToggle:Keybind({
+    Name =  "noclip",
+    Flag = "nocilpKeybind",
+    Default = Enum.KeyCode.I, 
+    Mode = "Toggle",
+    Callback = function(v)
+        noclip = v
+        if noclipConn then noclipConn:Disconnect() end
+        if v then
+            noclipConn = game:GetService("RunService").Stepped:Connect(function()
+                if game.Players.LocalPlayer.Character then
+                    for _, p in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                        if p:IsA("BasePart") then p.CanCollide = false end
+                    end
+                end
+            end)
+        else
+            if game.Players.LocalPlayer.Character then
+                for _, p in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                    if p:IsA("BasePart") then p.CanCollide = true end
+                end
+            end
+        end
+    end
+})
+
+game.Players.LocalPlayer.CharacterAdded:Connect(function()
+    if noclip and noclipConn then
+        wait(0.5)
+        noclipConn:Disconnect()
+        noclipConn = game:GetService("RunService").Stepped:Connect(function()
+            if game.Players.LocalPlayer.Character then
+                for _, p in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                    if p:IsA("BasePart") then p.CanCollide = false end
+                end
+            end
+        end)
+    end
+end)
+
     LocalPlayer.CharacterAdded:Connect(function(character)
         wait(1)
         if getgenv().NoClipEnabled then
