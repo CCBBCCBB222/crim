@@ -1,0 +1,508 @@
+local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, LocalPlayer, Camera, ReplicatedStorage, replicatedStorage, runService, player, UserInputService)
+
+    local staminaLoop
+    local function SetupInfiniteStamina()
+        local StaminaTbl = {}
+        for _, v in pairs(getgc(true)) do
+            if type(v) == "table" and rawget(v, "S") then
+                table.insert(StaminaTbl, v)
+            end
+        end
+
+        if staminaLoop then
+            staminaLoop:Disconnect()
+        end
+
+        staminaLoop = runService.RenderStepped:Connect(function()
+            if Toggles and Toggles.InfiniteStaminaToggle and Toggles.InfiniteStaminaToggle.Value then
+                for _, tbl in pairs(StaminaTbl) do
+                    tbl.S = 100
+                end
+            end
+        end)
+    end
+
+    fastPickupEnabled = false
+
+function bypassProximityPrompts()
+        for _, v in pairs(workspace:GetDescendants()) do
+                if v:IsA("ProximityPrompt") then
+                        v.HoldDuration = 0
+                end
+        end
+end
+
+function enableBypass()
+        fastPickupEnabled = true
+        bypassProximityPrompts()
+        game:GetService("ProximityPromptService").PromptButtonHoldBegan:Connect(function(v)
+                if fastPickupEnabled then
+                        v.HoldDuration = 0
+                end
+        end)
+end
+
+function disableBypass()
+        fastPickupEnabled = false
+end
+
+local function setFastPickUpEnabled(enabled)
+    fastPickUpEnabled = enabled
+
+    for prompt, data in pairs(proximityPrompts) do
+        if prompt:IsA("ProximityPrompt") then
+            prompt.HoldDuration = enabled and 0 or data.originalDuration
+        end
+    end
+end
+
+    local autoRespawn = false
+    local deathRespawnEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("DeathRespawn")
+
+    local function checkAndRespawn()
+        while autoRespawn do
+            local character = LocalPlayer.Character
+            local humanoid = character and character:FindFirstChildWhichIsA("Humanoid")
+            if humanoid and humanoid.Health <= 0 then
+                deathRespawnEvent:InvokeServer("KMG4R904")
+            end
+            wait(2)
+        end
+    end
+
+    MovementSection:Toggle({
+        Name = "Auto Respawn", 
+        Default = false, 
+        Flag = "AutoRespawnToggle",
+        Tooltip = "Respawns you when you die",
+        Callback = function(enabled)
+            autoRespawn = enabled
+            if enabled then
+                task.spawn(checkAndRespawn)
+            end
+        end
+    })
+
+    MovementSection:Toggle({
+        Name = "Fast Pickup", 
+        Default = false, 
+        Flag = "FastPickUpToggle",
+        Tooltip = "Instant pickup items",
+        Callback = function(Value)
+            if Value then
+                            enableBypass()
+                    else
+                            disableBypass()
+                    end
+            end
+    })
+
+    local toolsFolder = workspace:WaitForChild("Filter"):WaitForChild("SpawnedTools")
+    local cashFolder = workspace:WaitForChild("Filter"):WaitForChild("SpawnedBread")
+    local pilesFolder = workspace:WaitForChild("Filter"):WaitForChild("SpawnedPiles")
+
+    local pickupMethod = "Without Remote Event"
+    local cooldown = 0.8
+    local canPickup = true
+    local lastPickupTime = 0
+
+    local toolsEnabled, cashEnabled, scrapsEnabled, cratesEnabled = false, false, false, false
+    local toolsConnection, moneyConnection, scrapsConnection, cratesConnection = nil, nil, nil, nil
+
+    local function interactWithPrompt(v)
+        if v:IsA("ProximityPrompt") and canPickup then
+            v.HoldDuration = 0
+            fireproximityprompt(v)
+            canPickup = false
+            lastPickupTime = tick()
+        end
+    end
+
+    local function pickupWithoutRemote(v)
+        if toolsEnabled and v:IsA("Model") and toolsFolder:FindFirstChild(v.Name) then
+            for _, p in ipairs(v:GetDescendants()) do interactWithPrompt(p) end
+        elseif cashEnabled and v:IsA("BasePart") and v.Name == "CashDrop1" then
+            for _, p in ipairs(v:GetChildren()) do interactWithPrompt(p) end
+        elseif scrapsEnabled and v:IsA("Model") and (v.Name == "S1" or v.Name == "S2") then
+            for _, p in ipairs(v:GetDescendants()) do interactWithPrompt(p) end
+        elseif cratesEnabled and v:IsA("Model") and (v.Name == "C1" or v.Name == "C2" or v.Name == "C3") then
+            for _, p in ipairs(v:GetDescendants()) do interactWithPrompt(p) end
+        end
+    end
+
+    local function scanItems()
+        while toolsEnabled or cashEnabled or scrapsEnabled or cratesEnabled do
+            if not canPickup and tick() - lastPickupTime >= cooldown then
+                canPickup = true
+            end
+            for _, v in ipairs(toolsFolder:GetChildren()) do pickupWithoutRemote(v) end
+            for _, v in ipairs(cashFolder:GetChildren()) do pickupWithoutRemote(v) end
+            for _, v in ipairs(pilesFolder:GetChildren()) do pickupWithoutRemote(v) end
+            task.wait(0.1)
+        end
+    end
+
+    local function pickupRemote(folder, eventName, findCondition, posFn, cooldownTime, attrRev)
+        local remote = replicatedStorage:WaitForChild("Events"):WaitForChild(eventName)
+        local connection
+        local canPickup = true
+        local last = tick()
+
+        connection = runService.RenderStepped:Connect(function()
+            local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+
+            local closest, dist = nil, 15
+            for _, item in pairs(folder:GetChildren()) do
+                if findCondition(item) then
+                    local pos = posFn(item)
+                    local d = (hrp.Position - pos).Magnitude
+                    if d < dist then
+                        closest = item
+                        dist = d
+                    end
+                end
+            end
+
+            if closest and canPickup then
+                if attrRev then
+                    remote:FireServer(string.reverse(closest:GetAttribute(attrRev)))
+                else
+                    remote:FireServer(closest:FindFirstChild("Handle") or closest:FindFirstChild("WeaponHandle") or closest)
+                end
+                canPickup = false
+            elseif tick() - last >= cooldownTime then
+                canPickup = true
+                last = tick()
+            end
+        end)
+
+        return connection
+    end
+
+    MovementSection:Toggle({
+        Name = "Auto Pickup Scraps", 
+        Default = false, 
+        Flag = "ToggleScraps",
+        Callback = function(val)
+            scrapsEnabled = val
+            if scrapsConnection then scrapsConnection:Disconnect() end
+            if val then
+                if pickupMethod == "With Remote Event" then
+                    scrapsConnection = pickupRemote(pilesFolder, "PIC_PU", function(a)
+                        return a.Name == "S1" or a.Name == "S2"
+                    end, function(a) return a.MeshPart.Position end, 4.5, "jzu")
+                else
+                    task.spawn(scanItems)
+                end
+            end
+        end
+    })
+
+    MovementSection:Toggle({
+        Name = "Auto Pickup Tools", 
+        Default = false, 
+        Flag = "ToggleTools",
+        Callback = function(val)
+            toolsEnabled = val
+            if toolsConnection then toolsConnection:Disconnect() end
+            if val then
+                if pickupMethod == "With Remote Event" then
+                    toolsConnection = pickupRemote(toolsFolder, "PIC_TLO", function(a)
+                        return true
+                    end, function(a)
+                        local h = a:FindFirstChild("Handle") or a:FindFirstChild("WeaponHandle")
+                        return h and h.Position or Vector3.new()
+                    end, 1.5)
+                else
+                    task.spawn(scanItems)
+                end
+            end
+        end
+    })
+
+    MovementSection:Toggle({
+        Name = "Auto Pickup Cash", 
+        Default = false, 
+        Flag = "ToggleCash",
+        Callback = function(val)
+            cashEnabled = val
+            if moneyConnection then moneyConnection:Disconnect() end
+            if val then
+                if pickupMethod == "With Remote Event" then
+                    moneyConnection = pickupRemote(cashFolder, "CZDPZUS", function(a)
+                        return a:IsA("BasePart")
+                    end, function(a) return a.Position end, 0.7)
+                else
+                    task.spawn(scanItems)
+                end
+            end
+        end
+    })
+
+    getgenv().lockpickHBEEnabled = false
+
+    local function updateLockpickBars()
+        local PlayerGui = game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        if PlayerGui and PlayerGui:FindFirstChild("LockpickGUI") then
+            local frames = PlayerGui.LockpickGUI.MF.LP_Frame.Frames
+            for i = 1, 3 do
+                local Bar = frames["B" .. i].Bar
+                Bar.Size = getgenv().lockpickHBEEnabled and UDim2.new(0, 35, 0, 500) or UDim2.new(0, 35, 0, 30)
+            end
+        end
+    end
+
+    game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui").ChildAdded:Connect(function(child)
+        if child.Name == "LockpickGUI" then
+            updateLockpickBars()
+        end
+    end)
+
+    MovementSection:Toggle({
+        Name = "Auto Lockpick", 
+        Default = false, 
+        Flag = "LockpickHBEToggle",
+        Callback = function(value)
+            getgenv().lockpickHBEEnabled = value
+            updateLockpickBars()
+        end
+    })
+
+    local ThemesSection = SettingsTab:Section({ Name = "Settings", Side = 1 })
+
+    do
+        for Index, Value in Library.Theme do 
+            Library.ThemeColorpickers[Index] = ThemesSection:Label(Index, "Left"):Colorpicker({
+                Name = Index,
+                Flag = "Theme" .. Index,
+                Default = Value,
+                Callback = function(Value)
+                    Library.Theme[Index] = Value
+                    Library:ChangeTheme(Index, Value)
+                end
+            })
+        end
+
+        ThemesSection:Dropdown({Name = "Themes list", Items = {"Default", "Bitchbot", "Onetap", "Aqua"}, Default = "Default", Callback = function(Value)
+            local ThemeData = Library.Themes[Value]
+
+            if not ThemeData then 
+                return
+            end
+
+            for Index, Value in Library.Theme do 
+                Library.Theme[Index] = ThemeData[Index]
+                Library:ChangeTheme(Index, ThemeData[Index])
+
+                Library.ThemeColorpickers[Index]:Set(ThemeData[Index])
+            end
+
+            task.wait(0.3)
+
+            Library:Thread(function()
+                for Index, Value in Library.Theme do 
+                    Library.Theme[Index] = Library.Flags["Theme"..Index].Color
+                    Library:ChangeTheme(Index, Library.Flags["Theme"..Index].Color)
+                end    
+            end)
+        end})
+
+        local ThemeName
+        local SelectedTheme 
+
+        local ThemesListbox = ThemesSection:Listbox({
+            Name = "Themes List",
+            Flag = "Themes List",
+            Items = { },
+            Multi = false,
+            Default = nil,
+            Callback = function(Value)
+                SelectedTheme = Value
+            end
+        })
+
+        ThemesSection:Textbox({
+            Name = "Name",
+            Flag = "Theme Name",
+            Default = "",
+            Placeholder = ". . .",
+            Callback = function(Value)
+                ThemeName = Value
+            end
+        })
+
+        ThemesSection:Button({
+            Name = "Save Theme",
+            Callback = function()
+                if ThemeName == "" then 
+                    return
+                end
+
+                if not isfile(Library.Folders.Themes .. "/" .. ThemeName .. ".json") then
+                    writefile(Library.Folders.Themes .. "/" .. ThemeName .. ".json", Library:GetTheme())
+
+                    Library:RefreshThemeList(ThemesListbox)
+                else
+                    Library:Notification("Theme '" .. ThemeName .. ".json' already exists", 3, Color3.fromRGB(255, 0, 0))
+                    return
+                end
+            end
+        }):SubButton({
+            Name = "Load Theme",
+            Callback = function()
+                if SelectedTheme then
+                    Library:LoadTheme(readfile(Library.Folders.Themes .. "/" .. SelectedTheme))
+                end
+            end
+        })
+
+        ThemesSection:Button({
+            Name = "Refresh Themes",
+            Callback = function()
+                Library:RefreshThemeList(ThemesListbox)
+            end
+        })
+
+        Library:RefreshThemeList(ThemesListbox)
+    end
+
+    local ConfigsSection = SettingsTab:Section({  Name = "Configs", Side = 2 })
+
+    do 
+        local ConfigName 
+        local SelectedConfig 
+
+        local ConfigsListbox = ConfigsSection:Listbox({
+            Name = "Configs list",
+            Flag = "Configs List",
+            Items = { },
+            Multi = false,
+            Default = nil,
+            Callback = function(Value)
+                SelectedConfig = Value
+            end
+        })
+
+        ConfigsSection:Textbox({
+            Name = "Name",
+            Flag = "Config Name",
+            Default = "",
+            Placeholder = ". . .",
+            Callback = function(Value)
+                ConfigName = Value
+            end
+        })
+
+        ConfigsSection:Button({
+            Name = "Load Config",
+            Callback = function()
+                if SelectedConfig then
+                    Library:LoadConfig(SelectedConfig)  
+                end
+
+                Library:Thread(function()
+                    task.wait(0.1)
+
+                    for Index, Value in Library.Theme do 
+                        Library.Theme[Index] = Library.Flags["Theme"..Index].Color
+                        Library:ChangeTheme(Index, Library.Flags["Theme"..Index].Color)
+                    end    
+                end)
+            end
+        }):SubButton({
+            Name = "Save Config",
+            Callback = function()
+                if SelectedConfig then
+                    Library:SaveConfig(SelectedConfig)
+                end
+            end
+        })
+
+        ConfigsSection:Button({
+            Name = "Create Config",
+            Callback = function()
+                if ConfigName == "" then 
+                    return
+                end
+
+                if not isfile(Library.Folders.Configs .. "/" .. ConfigName .. ".json") then
+                    writefile(Library.Folders.Configs .. "/" .. ConfigName .. ".json", Library:GetConfig())
+
+                    Library:RefreshConfigsList(ConfigsListbox)
+                else
+                    Library:Notification("Config '" .. ConfigName .. ".json' already exists", 3, Color3.fromRGB(255, 0, 0))
+                    return
+                end
+            end
+        }):SubButton({
+            Name = "Delete Config",
+            Callback = function()
+                if SelectedConfig then
+                    Library:DeleteConfig(SelectedConfig)
+
+                    Library:RefreshConfigsList(ConfigsListbox)
+                end
+            end
+        })
+
+        ConfigsSection:Button({
+            Name = "Refresh Configs",
+            Callback = function()
+                Library:RefreshConfigsList(ConfigsListbox)
+            end
+        })
+
+        Library:RefreshConfigsList(ConfigsListbox)
+
+        ConfigsSection:Label("Menu Keybind", "Left"):Keybind({Name = "Menu Keybind", Flag = "Menu Keybind", Default = Enum.KeyCode.RightControl, Mode = "Toggle", Callback = function(Value)
+            Library.MenuKeybind = Library.Flags["Menu Keybind"].Key
+        end})
+
+        ConfigsSection:Toggle({Name = "Watermark", Flag = "Watermark", Default = false, Callback = function(Value)
+            if Library.Watermark then
+                Library.Watermark:SetVisibility(Value)
+            end
+        end})
+
+        ConfigsSection:Toggle({Name = "Keybind List", Flag = "Keybind List", Default = false, Callback = function(Value)
+            if Library.KeybindList then
+                Library.KeybindList:SetVisibility(Value)
+            end
+        end})
+
+        ConfigsSection:Dropdown({Name = "Style", Flag = "Tweening Style", Default = "Exponential", Items = {"Linear", "Sine", "Quad", "Cubic", "Quart", "Quint", "Exponential", "Circular", "Back", "Elastic", "Bounce"}, Callback = function(Value)
+            Library.Tween.Style = Enum.EasingStyle[Value]
+        end})
+
+        ConfigsSection:Dropdown({Name = "Direction", Flag = "Tweening Direction", Default = "Out", Items = {"In", "Out", "InOut"}, Callback = function(Value)
+            Library.Tween.Direction = Enum.EasingDirection[Value]
+        end})
+
+        ConfigsSection:Slider({Name = "Tweening Time", Min = 0, Max = 5, Default = 0.25, Decimals = 0.01, Flag = "Tweening Time", Callback = function(Value)
+            Library.Tween.Time = Value
+        end})
+
+        ConfigsSection:Button({Name = "Notification test", Callback = function()
+            Library:Notification("This is a notification This is a notification This is a notification This is a notification", 5, Color3.fromRGB(math.random(0, 255), math.random(0, 255), math.random(0, 255)))
+        end})
+
+        ConfigsSection:Button({Name = "Unload library", Callback = function()
+            Library:Unload()
+        end})
+    end
+
+    return {
+        toggleWalkSpeed = toggleWalkSpeed,
+        applyWalkSpeedBypass = applyWalkSpeedBypass,
+        removeWalkSpeedBypass = removeWalkSpeedBypass,
+        SetupInfiniteStamina = SetupInfiniteStamina,
+        checkAndRespawn = checkAndRespawn,
+        scanItems = scanItems,
+        pickupRemote = pickupRemote,
+        updateLockpickBars = updateLockpickBars,
+        setupCharacter = setupCharacter
+    }
+end
+
+return setupSettingsAndMovementModule
