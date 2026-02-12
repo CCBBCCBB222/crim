@@ -57,31 +57,58 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         setupCharacter(character)
     end)
 
-    -- 移除hook相关代码，改为直接持续设置
-    local walkSpeedConnection = nil
-    
+    local OldNewIndex
+    OldNewIndex = hookmetamethod(game, "__newindex", function(self, key, value)
+        if not checkcaller() and key == "WalkSpeed" and typeof(self) == "Instance" and self:IsA("Humanoid") then
+
+            if not OriginalWalkSpeeds[self] then
+                OriginalWalkSpeeds[self] = value
+            end
+
+            if WalkSpeedEnabled then
+                OriginalWalkSpeeds[self] = value
+                if value ~= DesiredSpeed then
+                    return
+                end
+            end
+        end
+        return OldNewIndex(self, key, value)
+    end)
+
+    local OldIndex
+    OldIndex = hookmetamethod(game, "__index", function(self, key)
+
+        if not checkcaller() and self == _Humanoid and key == "WalkSpeed" and WalkSpeedEnabled then
+            return DesiredSpeed
+        end
+        return OldIndex(self, key)
+    end)
+
+    local OldNamecall
+    OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        if not checkcaller() then
+            if method == "FireServer" and (self.Name == "__DFfDD" or self.Name == "0924023902330") then
+                return wait(9000000000)
+            elseif method == "Kick" then
+                return wait(9000000000)
+            end
+        end
+        return OldNamecall(self, ...)
+    end)
+
     local function applyWalkSpeedBypass()
         WalkSpeedEnabled = true
-        
-        -- 断开之前的连接
-        if walkSpeedConnection then
-            walkSpeedConnection:Disconnect()
-        end
-        
-        -- 持续设置移动速度
-        walkSpeedConnection = runService.Heartbeat:Connect(function()
-            if not WalkSpeedEnabled then 
-                walkSpeedConnection:Disconnect()
-                return 
-            end
-            
+
+        runService:BindToRenderStep("WalkSpeedBypass", Enum.RenderPriority.Character.Value + 1, function()
+            if not WalkSpeedEnabled then return end
+
             local character = LocalPlayer.Character
             if character then
                 local humanoid = character:FindFirstChildOfClass("Humanoid")
                 if humanoid then
                     _Humanoid = humanoid
-                    
-                    -- 直接设置速度
+
                     if WalkSpeedEnabled and humanoid.WalkSpeed ~= DesiredSpeed then
                         humanoid.WalkSpeed = DesiredSpeed
                     end
@@ -92,20 +119,15 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
 
     local function removeWalkSpeedBypass()
         WalkSpeedEnabled = false
-        
-        if walkSpeedConnection then
-            walkSpeedConnection:Disconnect()
-            walkSpeedConnection = nil
-        end
-        
-        -- 恢复原始速度
-        local character = LocalPlayer.Character
-        if character then
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid.WalkSpeed = OriginalWalkspeed
+        runService:UnbindFromRenderStep("WalkSpeedBypass")
+
+        for humanoid, originalSpeed in pairs(OriginalWalkSpeeds) do
+            if humanoid and humanoid.Parent then
+                humanoid.WalkSpeed = originalSpeed
             end
         end
+
+        OriginalWalkSpeeds = {}
     end
 
     LocalPlayer.CharacterAdded:Connect(function(char)
@@ -143,11 +165,11 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     })
 
     walkspeedToggle:Keybind({
-        Name = "speed",
-        Flag = "speedkey",
-        Default = Enum.KeyCode.T, 
-        Mode = "Toggle",
-        Callback = function(Value)
+    Name = "speed",
+    Flag = "speedkey",
+    Default = Enum.KeyCode.T, 
+    Mode = "Toggle",
+    Callback = function(Value)
             getgenv().WalkSpeedToggle = Value
             walkspeedToggle:Set(Value)
             if Value then
@@ -155,8 +177,8 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
             else
                 toggleWalkSpeed(false)
             end
-        end
-    })
+    end
+})
 
     MovementSection:Slider({
         Name = "Speed", 
@@ -181,15 +203,15 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     })
 
     HighjumpToggle:Keybind({
-        Name = "Highjump",
-        Flag = "HighjumpKeybind",
-        Default = Enum.KeyCode.Y,  
-        Mode = "Toggle",
-        Callback = function(Value)
-            jumpEnabled = Value
-            HighjumpToggle:Set(Value)
-        end
-    })
+    Name = "Highjump",
+    Flag = "HighjumpKeybind",
+    Default = Enum.KeyCode.Y,  
+    Mode = "Toggle",
+    Callback = function(Value)
+        jumpEnabled = Value
+        HighjumpToggle:Set(Value)
+    end
+})
 
     MovementSection:Slider({
         Name = "Highjump Power", 
@@ -260,11 +282,11 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     })
 
     noclipToggle:Keybind({
-        Name = "noclip",
-        Flag = "nocilpKeybind",
-        Default = Enum.KeyCode.I, 
-        Mode = "Toggle",
-        Callback = function(enabled)
+    Name =  "noclip",
+    Flag = "nocilpKeybind",
+    Default = Enum.KeyCode.I, 
+    Mode = "Toggle",
+    Callback = function(enabled)
             noclipToggle:Set(enabled)
             getgenv().NoClipEnabled = enabled
             local function applyNoClip()
@@ -312,8 +334,8 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
                     getgenv().CharacterAddedConnection = nil
                 end
             end
-        end
-    })
+    end
+})
 
     LocalPlayer.CharacterAdded:Connect(function(character)
         wait(1)
@@ -350,37 +372,37 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
 
     fastPickupEnabled = false
 
-    function bypassProximityPrompts()
+function bypassProximityPrompts()
         for _, v in pairs(workspace:GetDescendants()) do
-            if v:IsA("ProximityPrompt") then
-                v.HoldDuration = 0
-            end
+                if v:IsA("ProximityPrompt") then
+                        v.HoldDuration = 0
+                end
         end
-    end
+end
 
-    function enableBypass()
+function enableBypass()
         fastPickupEnabled = true
         bypassProximityPrompts()
         game:GetService("ProximityPromptService").PromptButtonHoldBegan:Connect(function(v)
-            if fastPickupEnabled then
-                v.HoldDuration = 0
-            end
+                if fastPickupEnabled then
+                        v.HoldDuration = 0
+                end
         end)
-    end
+end
 
-    function disableBypass()
+function disableBypass()
         fastPickupEnabled = false
-    end
+end
 
-    local function setFastPickUpEnabled(enabled)
-        fastPickUpEnabled = enabled
+local function setFastPickUpEnabled(enabled)
+    fastPickUpEnabled = enabled
 
-        for prompt, data in pairs(proximityPrompts) do
-            if prompt:IsA("ProximityPrompt") then
-                prompt.HoldDuration = enabled and 0 or data.originalDuration
-            end
+    for prompt, data in pairs(proximityPrompts) do
+        if prompt:IsA("ProximityPrompt") then
+            prompt.HoldDuration = enabled and 0 or data.originalDuration
         end
     end
+end
 
     local autoRespawn = false
     local deathRespawnEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("DeathRespawn")
@@ -416,11 +438,11 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         Tooltip = "Instant pickup items",
         Callback = function(Value)
             if Value then
-                enableBypass()
-            else
-                disableBypass()
+                            enableBypass()
+                    else
+                            disableBypass()
+                    end
             end
-        end
     })
 
     local toolsFolder = workspace:WaitForChild("Filter"):WaitForChild("SpawnedTools")
@@ -832,5 +854,3 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
 end
 
 return setupSettingsAndMovementModule
-
-
