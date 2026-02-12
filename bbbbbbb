@@ -1,5 +1,7 @@
 local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, LocalPlayer, Camera, ReplicatedStorage, replicatedStorage, runService, player, UserInputService)
 
+    local MovementSection = CombatTab:Section({Name = "Misc", Side = 1})
+
     local staminaLoop
     local function SetupInfiniteStamina()
         local StaminaTbl = {}
