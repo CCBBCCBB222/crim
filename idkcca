@@ -9,44 +9,18 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     local OriginalWalkSpeeds = {}
 
     local function setupCharacter(character)
-        local humanoid = character:WaitForChild("Humanoid")
-        local rootPart = character:WaitForChild("HumanoidRootPart")
-
-        local originalJumpFunction = humanoid.Jump
-
-        humanoid.Jump = function()
-            if not jumpEnabled or not rootPart or not rootPart.Parent then 
-                return originalJumpFunction()
-            end
-
-            if humanoid.FloorMaterial ~= Enum.Material.Air then
-                rootPart:ApplyImpulse(Vector3.new(0, jumpPower * rootPart.AssemblyMass, 0))
-                return true 
-            end
-
-            return originalJumpFunction()
-        end
-
-        UserInputService.JumpRequest:Connect(function()
-            if not jumpEnabled or not rootPart or not rootPart.Parent then return end
-
-            if humanoid.FloorMaterial ~= Enum.Material.Air then
-                rootPart:ApplyImpulse(Vector3.new(0, jumpPower * rootPart.AssemblyMass, 0))
-            end
-        end)
-
-        UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-
-            if input.KeyCode == Enum.KeyCode.Space then
-                if not jumpEnabled or not rootPart or not rootPart.Parent then return end
-
-                if humanoid.FloorMaterial ~= Enum.Material.Air then
-                    rootPart:ApplyImpulse(Vector3.new(0, jumpPower * rootPart.AssemblyMass, 0))
-                end
-            end
-        end)
+       local humanoid = character:WaitForChild("Humanoid")
+       local rootPart = character:WaitForChild("HumanoidRootPart")
+    
+       local originalJumpPower = humanoid.JumpPower
+    
+       if jumpEnabled then
+          humanoid.JumpPower = jumpPower
+       else
+           humanoid.JumpPower = originalJumpPower
+       end
     end
+
 
     if LocalPlayer.Character then
         setupCharacter(LocalPlayer.Character)
