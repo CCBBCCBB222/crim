@@ -226,21 +226,27 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
 
-  noclipToggle = MovementSection:Toggle({
+    MovementSection:Toggle({
     Name = "Noclip", 
     Default = false,
     Callback = function(v)
         noclip = v
+        if noclipConn then 
+            noclipConn:Disconnect() 
+            noclipConn = nil
+        end
         
         if v then
-            -- 开启Noclip：只设置一次碰撞为false
-            if game.Players.LocalPlayer.Character then
-                for _, p in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
-                    if p:IsA("BasePart") then 
-                        p.CanCollide = false 
+            -- 开启Noclip：持续设置碰撞为false
+            noclipConn = game:GetService("RunService").Stepped:Connect(function()
+                if game.Players.LocalPlayer.Character then
+                    for _, p in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                        if p:IsA("BasePart") then 
+                            p.CanCollide = false 
+                        end
                     end
                 end
-            end
+            end)
         else
             -- 关闭Noclip：只设置一次碰撞为true
             if game.Players.LocalPlayer.Character then
@@ -254,45 +260,26 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
     end
 })
 
-noclipToggle:Keybind({
-    Name =  "noclip",
-    Flag = "nocilpKeybind",
-    Default = Enum.KeyCode.I, 
-    Mode = "Toggle",
-    Callback = function(v)
-        noclipToggle:Set(v)
-        noclip = v
-        
-        if v then
-            -- 开启Noclip：只设置一次碰撞为false
-            if game.Players.LocalPlayer.Character then
-                for _, p in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
-                    if p:IsA("BasePart") then 
-                        p.CanCollide = false 
-                    end
-                end
-            end
-        else
-            -- 关闭Noclip：只设置一次碰撞为true
-            if game.Players.LocalPlayer.Character then
-                for _, p in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
-                    if p:IsA("BasePart") then 
-                        p.CanCollide = true 
-                    end
-                end
-            end
-        end
-    end
-})
-
+-- 角色重生时重新应用Noclip设置
 game.Players.LocalPlayer.CharacterAdded:Connect(function(character)
     wait(0.5) -- 等待角色完全加载
     
-    if noclip then
-        -- 如果Noclip是开启状态，重新设置碰撞为false
+    if noclip and not noclipConn then
+        -- 重新开启Noclip
+        noclipConn = game:GetService("RunService").Stepped:Connect(function()
+            if game.Players.LocalPlayer.Character then
+                for _, p in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                    if p:IsA("BasePart") then 
+                        p.CanCollide = false 
+                    end
+                end
+            end
+        end)
+    elseif not noclip then
+        -- 如果Noclip是关闭状态，确保碰撞为true
         for _, p in pairs(character:GetDescendants()) do
             if p:IsA("BasePart") then 
-                p.CanCollide = false 
+                p.CanCollide = true 
             end
         end
     end
