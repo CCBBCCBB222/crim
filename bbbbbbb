@@ -1,6 +1,241 @@
 local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, LocalPlayer, Camera, ReplicatedStorage, replicatedStorage, runService, player, UserInputService)
 
+    local DesiredSpeed = 35
+    local OriginalWalkspeed = 16
+    local _Humanoid
+    local WalkSpeedEnabled = false  
+    local jumpPower = 14
+    local jumpEnabled = false
+    local OriginalWalkSpeeds = {}
+
+    local function setupCharacter(character)
+        local humanoid = character:WaitForChild("Humanoid")
+        local rootPart = character:WaitForChild("HumanoidRootPart")
+
+        local originalJumpFunction = humanoid.Jump
+
+        humanoid.Jump = function()
+            if not jumpEnabled or not rootPart or not rootPart.Parent then 
+                return originalJumpFunction()
+            end
+
+            if humanoid.FloorMaterial ~= Enum.Material.Air then
+                rootPart:ApplyImpulse(Vector3.new(0, jumpPower * rootPart.AssemblyMass, 0))
+                return true 
+            end
+
+            return originalJumpFunction()
+        end
+
+        UserInputService.JumpRequest:Connect(function()
+            if not jumpEnabled or not rootPart or not rootPart.Parent then return end
+
+            if humanoid.FloorMaterial ~= Enum.Material.Air then
+                rootPart:ApplyImpulse(Vector3.new(0, jumpPower * rootPart.AssemblyMass, 0))
+            end
+        end)
+
+        UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+
+            if input.KeyCode == Enum.KeyCode.Space then
+                if not jumpEnabled or not rootPart or not rootPart.Parent then return end
+
+                if humanoid.FloorMaterial ~= Enum.Material.Air then
+                    rootPart:ApplyImpulse(Vector3.new(0, jumpPower * rootPart.AssemblyMass, 0))
+                end
+            end
+        end)
+    end
+
+    if LocalPlayer.Character then
+        setupCharacter(LocalPlayer.Character)
+    end
+
+    LocalPlayer.CharacterAdded:Connect(function(character)
+        wait(0.5)
+        setupCharacter(character)
+    end)
+
+    local OldNewIndex
+    OldNewIndex = hookmetamethod(game, "__newindex", function(self, key, value)
+        if not checkcaller() and key == "WalkSpeed" and typeof(self) == "Instance" and self:IsA("Humanoid") then
+
+            if not OriginalWalkSpeeds[self] then
+                OriginalWalkSpeeds[self] = value
+            end
+
+            if WalkSpeedEnabled then
+                OriginalWalkSpeeds[self] = value
+                if value ~= DesiredSpeed then
+                    return
+                end
+            end
+        end
+        return OldNewIndex(self, key, value)
+    end)
+
+    local OldIndex
+    OldIndex = hookmetamethod(game, "__index", function(self, key)
+
+        if not checkcaller() and self == _Humanoid and key == "WalkSpeed" and WalkSpeedEnabled then
+            return DesiredSpeed
+        end
+        return OldIndex(self, key)
+    end)
+
+    local OldNamecall
+    OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        if not checkcaller() then
+            if method == "FireServer" and (self.Name == "__DFfDD" or self.Name == "0924023902330") then
+                return wait(9000000000)
+            elseif method == "Kick" then
+                return wait(9000000000)
+            end
+        end
+        return OldNamecall(self, ...)
+    end)
+
+    local function applyWalkSpeedBypass()
+        WalkSpeedEnabled = true
+
+        runService:BindToRenderStep("WalkSpeedBypass", Enum.RenderPriority.Character.Value + 1, function()
+            if not WalkSpeedEnabled then return end
+
+            local character = LocalPlayer.Character
+            if character then
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    _Humanoid = humanoid
+
+                    if WalkSpeedEnabled and humanoid.WalkSpeed ~= DesiredSpeed then
+                        humanoid.WalkSpeed = DesiredSpeed
+                    end
+                end
+            end
+        end)
+    end
+
+    local function removeWalkSpeedBypass()
+        WalkSpeedEnabled = false
+        runService:UnbindFromRenderStep("WalkSpeedBypass")
+
+        for humanoid, originalSpeed in pairs(OriginalWalkSpeeds) do
+            if humanoid and humanoid.Parent then
+                humanoid.WalkSpeed = originalSpeed
+            end
+        end
+
+        OriginalWalkSpeeds = {}
+    end
+
+    LocalPlayer.CharacterAdded:Connect(function(char)
+        repeat task.wait() until char:FindFirstChildOfClass("Humanoid")
+        if getgenv().WalkSpeedToggle then
+            applyWalkSpeedBypass()
+        end
+    end)
+
+    getgenv().WalkSpeedToggle = false
+
+    local function toggleWalkSpeed(enabled)
+        getgenv().WalkSpeedToggle = enabled
+        if enabled then
+            applyWalkSpeedBypass()
+        else
+            removeWalkSpeedBypass()
+        end
+    end
+
     local MovementSection = CombatTab:Section({Name = "Misc", Side = 1})
+
+    local walkspeedToggle = MovementSection:Toggle({
+        Name = "Walkspeed", 
+        Default = false, 
+        Flag = "WalkSpeedToggle",
+        Callback = function(enabled)
+            getgenv().WalkSpeedToggle = enabled
+            if enabled then
+                toggleWalkSpeed(true)
+            else
+                toggleWalkSpeed(false)
+            end
+        end
+    })
+
+    walkspeedToggle:Keybind({
+    Name = "speed",
+    Flag = "speedkey",
+    Default = Enum.KeyCode.T, 
+    Mode = "Toggle",
+    Callback = function(Value)
+            getgenv().WalkSpeedToggle = Value
+            walkspeedToggle:Set(Value)
+            if Value then
+                toggleWalkSpeed(true)
+            else
+                toggleWalkSpeed(false)
+            end
+    end
+})
+
+    MovementSection:Slider({
+        Name = "Speed", 
+        Flag = "WalkSpeedSlider", 
+        Min = 0, 
+        Default = 35, 
+        Max = 250, 
+        Suffix = "", 
+        Decimals = 1, 
+        Callback = function(val)
+            DesiredSpeed = val
+        end
+    })
+
+    local HighjumpToggle = MovementSection:Toggle({
+        Name = "Enabled Highjump", 
+        Default = false, 
+        Flag = "HighjumpToggle",
+        Callback = function(Value)
+            jumpEnabled = Value
+        end
+    })
+
+    HighjumpToggle:Keybind({
+    Name = "Highjump",
+    Flag = "HighjumpKeybind",
+    Default = Enum.KeyCode.Y,  
+    Mode = "Toggle",
+    Callback = function(Value)
+        jumpEnabled = Value
+        HighjumpToggle:Set(Value)
+    end
+})
+
+    MovementSection:Slider({
+        Name = "Highjump Power", 
+        Flag = "HighjumpSlider", 
+        Min = 0, 
+        Default = 13, 
+        Max = 50, 
+        Suffix = "", 
+        Decimals = 1, 
+        Callback = function(Value)
+            jumpPower = Value
+        end
+    })
+
+    LocalPlayer.CharacterAdded:Connect(function(character)
+        wait(1)
+        if getgenv().NoClipEnabled then
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
 
     local staminaLoop
     local function SetupInfiniteStamina()
