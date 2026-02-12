@@ -226,58 +226,62 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         end
     })
 
-local noclipEnabled = false
-local noclipBodyVelocity = nil
-
-local function enableNoclip()
-    if noclipBodyVelocity then
-        noclipBodyVelocity:Destroy()
-        noclipBodyVelocity = nil
-    end
-    
-    local character = game.Players.LocalPlayer.Character
-    if not character then return end
-    
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    
-    -- 创建BodyVelocity来覆盖物理
-    noclipBodyVelocity = Instance.new("BodyVelocity")
-    noclipBodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    noclipBodyVelocity.MaxForce = Vector3.new(0, 0, 0) -- 设置为0以禁用物理
-    noclipBodyVelocity.Parent = hrp
-    
-    -- 禁用碰撞
-    hrp.CanCollide = false
-end
-
-MovementSection:Toggle({
+    MovementSection:Toggle({
     Name = "Noclip", 
     Default = false,
-    Callback = function(value)
-        noclipEnabled = value
-        if value then
-            enableNoclip()
+    Callback = function(v)
+        noclip = v
+        if noclipConn then 
+            noclipConn:Disconnect() 
+            noclipConn = nil
+        end
+        
+        if v then
+            -- 开启Noclip：持续设置碰撞为false
+            noclipConn = game:GetService("RunService").Stepped:Connect(function()
+                if game.Players.LocalPlayer.Character then
+                    for _, p in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                        if p:IsA("BasePart") then 
+                            p.CanCollide = false 
+                        end
+                    end
+                end
+            end)
         else
-            if noclipBodyVelocity then
-                noclipBodyVelocity:Destroy()
-                noclipBodyVelocity = nil
-            end
-            -- 恢复碰撞
+            -- 关闭Noclip：只设置一次碰撞为true
             if game.Players.LocalPlayer.Character then
-                local hrp = game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    hrp.CanCollide = true
+                for _, p in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                    if p:IsA("BasePart") then 
+                        p.CanCollide = true 
+                    end
                 end
             end
         end
     end
 })
 
+-- 角色重生时重新应用Noclip设置
 game.Players.LocalPlayer.CharacterAdded:Connect(function(character)
-    if noclipEnabled then
-        wait(0.5)
-        enableNoclip()
+    wait(0.5) -- 等待角色完全加载
+    
+    if noclip and not noclipConn then
+        -- 重新开启Noclip
+        noclipConn = game:GetService("RunService").Stepped:Connect(function()
+            if game.Players.LocalPlayer.Character then
+                for _, p in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                    if p:IsA("BasePart") then 
+                        p.CanCollide = false 
+                    end
+                end
+            end
+        end)
+    elseif not noclip then
+        -- 如果Noclip是关闭状态，确保碰撞为true
+        for _, p in pairs(character:GetDescendants()) do
+            if p:IsA("BasePart") then 
+                p.CanCollide = true 
+            end
+        end
     end
 end)
 
