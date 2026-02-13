@@ -156,6 +156,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         Flag = "WalkSpeedToggle",
         Callback = function(enabled)
             getgenv().WalkSpeedToggle = enabled
+            walkspeedToggle:Set(Value)
             if enabled then
                 toggleWalkSpeed(true)
             else
@@ -199,6 +200,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
         Flag = "HighjumpToggle",
         Callback = function(Value)
             jumpEnabled = Value
+            HighjumpToggle:Set(Value)
         end
     })
 
