@@ -235,7 +235,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
             noclipConn:Disconnect() 
             noclipConn = nil
         end
-        
+
         if v then
             -- 开启Noclip：持续设置碰撞为false
             noclipConn = game:GetService("RunService").Stepped:Connect(function()
@@ -263,7 +263,7 @@ local function setupSettingsAndMovementModule(CombatTab, SettingsTab, Library, L
 -- 角色重生时重新应用Noclip设置
 game.Players.LocalPlayer.CharacterAdded:Connect(function(character)
     wait(0.5) -- 等待角色完全加载
-    
+
     if noclip and not noclipConn then
         -- 重新开启Noclip
         noclipConn = game:GetService("RunService").Stepped:Connect(function()
@@ -285,27 +285,33 @@ game.Players.LocalPlayer.CharacterAdded:Connect(function(character)
     end
 end)
 
-    local staminaLoop
-    local function SetupInfiniteStamina()
-        local StaminaTbl = {}
-        for _, v in pairs(getgc(true)) do
-            if type(v) == "table" and rawget(v, "S") then
-                table.insert(StaminaTbl, v)
-            end
+local staminaLoop
+local function SetupInfiniteStamina()
+    local StaminaTbl = {}
+    for _, v in pairs(getgc(true)) do
+        if type(v) == "table" and rawget(v, "S") then
+            table.insert(StaminaTbl, v)
         end
+    end
 
-        if staminaLoop then
-            staminaLoop:Disconnect()
-        end
+    if staminaLoop then
+        staminaLoop:Disconnect()
+    end
 
-        staminaLoop = runService.RenderStepped:Connect(function()
+    local lastUpdate = 0
+    staminaLoop = runService.RenderStepped:Connect(function(deltaTime)
+        lastUpdate = lastUpdate + deltaTime
+        if lastUpdate >= 0.5 then
+            lastUpdate = 0
+            
             if Toggles and Toggles.InfiniteStaminaToggle and Toggles.InfiniteStaminaToggle.Value then
                 for _, tbl in pairs(StaminaTbl) do
                     tbl.S = 100
                 end
             end
-        end)
-    end
+        end
+    end)
+end
 
     fastPickupEnabled = false
 
