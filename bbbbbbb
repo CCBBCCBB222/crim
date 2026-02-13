@@ -265,19 +265,13 @@ end
     Default = false,
     Callback = function(v)
         NoclipEnabled = v
+        if Value then
+            noclip()
+        else
+            clip()
+        end
     end
 })
-
--- 角色重生时重新应用Noclip设置
-game.Players.LocalPlayer.CharacterAdded:Connect(function(character)
-    wait(0.5) -- 等待角色完全加载
-    
-    if noclip and not noclipConn then
-        NoclipEnabled = true
-    elseif not noclip then
-        NoclipEnabled = false
-    end
-end)
 
     local staminaLoop
     local function SetupInfiniteStamina()
