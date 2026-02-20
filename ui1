@@ -759,23 +759,47 @@ local Library do
         self.ThemeMap[Item] = ThemeData
     end
 
-    Library.GetConfig = function(self)
-        local Config = { } 
-
-        local Success, Result = Library:SafeCall(function()
-            for Index, Value in pairs(Library.Flags) do  
-                if type(Value) == "table" and Value.Key then
-                    Config[Index] = {Key = tostring(Value.Key), Mode = Value.Mode}
-                elseif type(Value) == "table" and Value.Color then
-                    Config[Index] = {Color = Value.HexValue, Alpha = Value.Alpha}
-                else
-                    Config[Index] = Value
-                end
-            end
-        end)
-
-        return HttpService:JSONEncode(Config)
+  Library.GetConfig = function(self)
+    local Config = { } 
+    
+    -- 添加类型检查，确保 Library.Flags 是表格
+    if type(Library.Flags) ~= "table" then
+        warn("Library.Flags 不是表格类型，当前类型: " .. type(Library.Flags))
+        -- 强制转换为空表格
+        Library.Flags = {}
     end
+    
+    local Success, Result = Library:SafeCall(function()
+        for Index, Value in pairs(Library.Flags) do  -- 注意：这里应该是 pairs(Library.Flags)
+            if type(Value) == "table" and Value.Key then
+                Config[Index] = {Key = tostring(Value.Key), Mode = Value.Mode or "Toggle"}
+            elseif type(Value) == "table" and Value.Color then
+                Config[Index] = {Color = Value.HexValue or "FFFFFF", Alpha = Value.Alpha or 1}
+            else
+                Config[Index] = Value
+            end
+        end
+    end)
+    
+    -- 检查 SafeCall 是否成功
+    if not Success then
+        warn("GetConfig 执行失败: " .. tostring(Result))
+        return "{}"  -- 返回空JSON而不是nil
+    end
+    
+    -- 安全地进行JSON编码
+    local jsonSuccess, jsonResult = pcall(function()
+        return HttpService:JSONEncode(Config)
+    end)
+    
+    if not jsonSuccess then
+        warn("JSON编码失败: " .. tostring(jsonResult))
+        return "{}"
+    end
+    
+    return jsonResult
+  end
+
 
   Library.LoadConfig = function(self, Config)
     local success, Decoded = HttpService:JSONEncode(Config)
