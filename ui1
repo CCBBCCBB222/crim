@@ -67,7 +67,7 @@ local Library do
 
         Folders = {
             Directory = "testpath",
-            Configs = "Configs",
+            Configs = "testpath/Configs",
             Assets = "testpath/Assets",
             Themes = "testpath/Themes"
         },
