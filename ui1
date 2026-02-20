@@ -819,7 +819,7 @@ local Library do
        warn("前100个字符: " .. Config:sub(1, 100))
        warn("后100个字符: " .. Config:sub(-100))
     
-    -- 检查字符串是否包含非法字符
+
        for i = 1, #Config do
           local byte = Config:byte(i)
           if byte < 32 and byte ~= 9 and byte ~= 10 and byte ~= 13 then  -- 非空格、制表符、换行符的控制字符
@@ -831,13 +831,7 @@ local Library do
        return false
     end
 
-    
-    if not success then
-        Library:Notification("JSON解析失败: " .. tostring(Decoded), 5, FromRGB(255, 0, 0))
-        return false
-    end
-    
-    -- 检查解码结果是否为表格
+   
     if type(Decoded) ~= "table" then
         Library:Notification("配置格式错误: 应为表格类型", 5, FromRGB(255, 0, 0))
         return false
