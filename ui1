@@ -778,12 +778,29 @@ local Library do
     end
 
   Library.LoadConfig = function(self, Config)
+    -- 检查配置是否为空
+    if not Config or Config == "" then
+        Library:Notification("配置为空", 5, Color3.fromRGB(255, 0, 0))
+        return false
+    end
+    
     local success, Decoded = pcall(function()
         return HttpService:JSONDecode(Config)
     end)
     
     if not success then
-        Library:Notification("配置格式错误: 无效的JSON", 5, Color3.fromRGB(255, 0, 0))
+        -- 提供更详细的错误信息
+        local errorMsg = "配置格式错误: " .. tostring(Decoded)
+        if string.find(tostring(Decoded), "expected") then
+            errorMsg = errorMsg .. " - 请检查JSON语法（缺少引号、括号等）"
+        end
+        Library:Notification(errorMsg, 5, Color3.fromRGB(255, 0, 0))
+        return false
+    end
+    
+    -- 验证解码后的数据结构
+    if type(Decoded) ~= "table" then
+        Library:Notification("配置数据格式不正确: 应为表结构", 5, Color3.fromRGB(255, 0, 0))
         return false
     end
     
@@ -793,31 +810,63 @@ local Library do
             
             if not SetFunction then
                 warn("未找到标志: " .. tostring(Index))
+                -- 跳过不存在的标志，继续加载其他配置
+                Library:Notification("跳过未知配置项: " .. tostring(Index), 3, Color3.fromRGB(255, 165, 0))
                 continue
             end
 
-            -- 处理不同类型的值
+            -- 增强类型检查和处理
             if type(Value) == "table" then
                 if Value.Key then 
                     -- 键位绑定
-                    SetFunction(Value)
+                    if type(Value.Key) == "string" then
+                        -- 尝试将字符串转换为Enum
+                        local keyEnum
+                        pcall(function()
+                            keyEnum = Enum.KeyCode[Value.Key]
+                        end)
+                        if keyEnum then
+                            SetFunction({Key = keyEnum, Mode = Value.Mode or "Toggle"})
+                        else
+                            warn("无效的键位: " .. tostring(Value.Key))
+                        end
+                    else
+                        SetFunction(Value)
+                    end
                 elseif Value.Color then
                     -- 颜色选择器
-                    if Value.Alpha then
-                        SetFunction(Value.Color, Value.Alpha)
+                    local colorSuccess, color = pcall(function()
+                        if type(Value.Color) == "string" and string.sub(Value.Color, 1, 1) == "#" then
+                            return Color3.fromHex(Value.Color)
+                        else
+                            return Color3.new(Value.Color[1] or 1, Value.Color[2] or 1, Value.Color[3] or 1)
+                        end
+                    end)
+                    
+                    if colorSuccess and color then
+                        if Value.Alpha then
+                            SetFunction(color, Value.Alpha)
+                        else
+                            SetFunction(color)
+                        end
                     else
-                        SetFunction(Value.Color)
+                        warn("颜色值格式错误: " .. tostring(Value.Color))
                     end
-                elseif Value.Value then
+                elseif Value.Value ~= nil then
                     -- 滑块值
-                    SetFunction(Value.Value)
+                    SetFunction(tonumber(Value.Value) or Value.Value)
                 else
                     -- 普通表（可能是下拉菜单等多选值）
                     SetFunction(Value)
                 end
             else
                 -- 简单值（布尔值、数字、字符串）
-                SetFunction(Value)
+                if type(Value) == "string" and (Value == "true" or Value == "false") then
+                    -- 处理字符串形式的布尔值
+                    SetFunction(Value == "true")
+                else
+                    SetFunction(Value)
+                end
             end
         end
     end)
@@ -838,63 +887,12 @@ local Library do
         end
     end
 
-  Library.SaveConfig = function(self, ConfigName)
-    if not ConfigName or ConfigName == "" then
-        Library:Notification("配置名不能为空", 5, Color3.fromRGB(255, 0, 0))
-        return false
-    end
-    
-    local configData = {}
-    
-    -- 收集所有标志的当前值
-    for flagName, flagData in pairs(Library.Flags) do
-        if flagData.Value ~= nil then
-            if flagData.Type == "Color" then
-                configData[flagName] = {
-                    Color = {flagData.Value.R, flagData.Value.G, flagData.Value.B},
-                    Alpha = flagData.Alpha or 1
-                }
-            elseif flagData.Type == "Keybind" then
-                configData[flagName] = {
-                    Key = flagData.Value,
-                    Mode = flagData.Mode or "Toggle"
-                }
-            else
-                configData[flagName] = flagData.Value
-            end
+    Library.SaveConfig = function(self, Config)
+        if isfile(Library.Folders.Configs .. "/" .. Config) then
+            writefile(Library.Folders.Configs .. "/" .. Config, Library:GetConfig())
+            Library:Notification("Saved config " .. Config .. ".json", 5, FromRGB(0, 255, 0))
         end
     end
-    
-    -- JSON 编码（带错误处理）
-    local configJson
-    local success, err = pcall(function()
-        configJson = HttpService:JSONEncode(configData)
-    end)
-    
-    if not success then
-        Library:Notification("配置编码失败: " .. tostring(err), 5, Color3.fromRGB(255, 0, 0))
-        return false
-    end
-    
-    local configPath = Library.Folders.Configs .. "/" .. ConfigName
-    if not configPath:match("%.json$") then
-        configPath = configPath .. ".json"
-    end
-    
-    -- 写入文件
-    success, err = pcall(function()
-        writefile(configPath, configJson)
-    end)
-    
-    if success then
-        Library:Notification("配置保存成功: " .. ConfigName, 5, Color3.fromRGB(0, 255, 0))
-        return true
-    else
-        Library:Notification("配置保存失败: " .. tostring(err), 5, Color3.fromRGB(255, 0, 0))
-        return false
-    end
-  end
-
 
     Library.RefreshConfigsList = function(self, Element)
         local CurrentList = { }
