@@ -777,7 +777,7 @@ local Library do
         return HttpService:JSONEncode(Config)
     end
 
-  Library.LoadConfig = function(self, ConfigName)
+ Library.LoadConfig = function(self, ConfigName)
     -- 添加参数验证
     if not ConfigName or ConfigName == "" then
         Library:Notification("配置名不能为空", 5, Color3.fromRGB(255, 0, 0))
@@ -868,7 +868,7 @@ local Library do
         end
     end)
 
-    if errorCount == 0 then
+  if errorCount == 0 then
         Library:Notification(string.format("配置加载成功! (%d/%d)", loadedCount, totalFlags), 5, Color3.fromRGB(0, 255, 0))
     else
         Library:Notification(string.format("配置部分加载 (%d/%d 成功, %d 失败)", loadedCount, totalFlags, errorCount), 5, Color3.fromRGB(255, 165, 0))
@@ -885,7 +885,7 @@ local Library do
         Library:Notification("配置加载失败: " .. tostring(Result), 5, Color3.fromRGB(255, 0, 0))
         return false
     end
-  end
+ end
 
     Library.DeleteConfig = function(self, Config)
         if isfile(Library.Folders.Configs .. "/" .. Config) then 
