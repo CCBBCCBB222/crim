@@ -760,7 +760,7 @@ local Library do
     end
 
   Library.GetConfig = function(self)
-    local Config = { } 
+    local Config = {} 
     
     -- 添加类型检查，确保 Library.Flags 是表格
     if type(Library.Flags) ~= "table" then
@@ -770,7 +770,7 @@ local Library do
     end
     
     local Success, Result = Library:SafeCall(function()
-        for Index, Value in pairs(Library.Flags) do  -- 注意：这里应该是 pairs(Library.Flags)
+        for Index, Value in pairs(Library.Flags) do
             if type(Value) == "table" and Value.Key then
                 Config[Index] = {Key = tostring(Value.Key), Mode = Value.Mode or "Toggle"}
             elseif type(Value) == "table" and Value.Color then
@@ -800,12 +800,26 @@ local Library do
     return jsonResult
   end
 
-
   Library.LoadConfig = function(self, Config)
-    local success, Decoded = HttpService:JSONDecode(Config)
-
+    -- 检查Config是否为空或无效
+    if not Config or type(Config) ~= "string" or #Config == 0 then
+        Library:Notification("配置内容为空或无效", 5, FromRGB(255, 0, 0))
+        return false
+    end
+    
+    -- 使用pcall安全解码JSON
+    local success, Decoded = pcall(function()
+        return HttpService:JSONDecode(Config)
+    end)
+    
     if not success then
         Library:Notification("JSON解析失败: " .. tostring(Decoded), 5, FromRGB(255, 0, 0))
+        return false
+    end
+    
+    -- 检查解码结果是否为表格
+    if type(Decoded) ~= "table" then
+        Library:Notification("配置格式错误: 应为表格类型", 5, FromRGB(255, 0, 0))
         return false
     end
     
@@ -815,7 +829,7 @@ local Library do
             
             if not SetFunction then
                 warn("未知的Flag: " .. tostring(Index))
-                continue
+                goto continue  -- 使用goto代替continue
             end
             
             -- 添加类型检查
@@ -823,16 +837,27 @@ local Library do
                 if Value.Key then 
                     SetFunction(Value)
                 elseif Value.Color then
-                    SetFunction(Value.Color, Value.Alpha)
+                    SetFunction(Value.Color, Value.Alpha or 1)  -- 添加默认透明度
                 else
                     warn("不支持的表格格式: " .. tostring(Index))
                 end
             else
                 SetFunction(Value)
             end
+            
+            ::continue::
         end
     end)
+    
+    if Success then
+        Library:Notification("配置加载成功", 5, FromRGB(0, 255, 0))
+        return true
+    else
+        Library:Notification("配置加载失败: " .. tostring(Result), 5, FromRGB(255, 0, 0))
+        return false
+    end
   end
+
 
 
     Library.DeleteConfig = function(self, Config)
