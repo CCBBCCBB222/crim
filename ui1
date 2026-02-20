@@ -811,6 +811,26 @@ local Library do
     local success, Decoded = pcall(function()
         return HttpService:JSONDecode(Config)
     end)
+
+    if not success then
+    -- 打印详细错误信息
+       warn("JSON解码失败，错误信息: " .. tostring(Decoded))
+       warn("配置字符串长度: " .. #Config)
+       warn("前100个字符: " .. Config:sub(1, 100))
+       warn("后100个字符: " .. Config:sub(-100))
+    
+    -- 检查字符串是否包含非法字符
+       for i = 1, #Config do
+          local byte = Config:byte(i)
+          if byte < 32 and byte ~= 9 and byte ~= 10 and byte ~= 13 then  -- 非空格、制表符、换行符的控制字符
+            warn("发现非法控制字符在位置 " .. i .. ": " .. byte)
+          end
+       end
+    
+       Library:Notification("JSON解析失败: " .. tostring(Decoded), 5, Color3.fromRGB(255, 0, 0))
+       return false
+    end
+
     
     if not success then
         Library:Notification("JSON解析失败: " .. tostring(Decoded), 5, FromRGB(255, 0, 0))
