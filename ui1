@@ -777,50 +777,106 @@ local Library do
         return HttpService:JSONEncode(Config)
     end
 
-  Library.LoadConfig = function(self, Config)
-    local success, Decoded = pcall(function()
-        return HttpService:JSONDecode(Config)
-    end)
-    
-    if not success then
-        Library:Notification("配置格式错误: 无效的JSON", 5, Color3.fromRGB(255, 0, 0))
+  Library.LoadConfig = function(self, ConfigName)
+    -- 添加参数验证
+    if not ConfigName or ConfigName == "" then
+        Library:Notification("配置名不能为空", 5, Color3.fromRGB(255, 0, 0))
         return false
     end
     
+    -- 处理文件路径
+    local configPath = Library.Folders.Configs .. "/" .. ConfigName
+    if not configPath:match("%.json$") then
+        configPath = configPath .. ".json"
+    end
+    
+    -- 检查文件是否存在
+    if not isfile(configPath) then
+        Library:Notification("配置文件不存在: " .. configPath, 5, Color3.fromRGB(255, 0, 0))
+        return false
+    end
+    
+    -- 读取文件内容
+    local configContent
+    local success, err = pcall(function()
+        configContent = readfile(configPath)
+    end)
+    
+    if not success or not configContent then
+        Library:Notification("读取配置文件失败: " .. tostring(err), 5, Color3.fromRGB(255, 0, 0))
+        return false
+    end
+    
+    -- JSON 解码（带错误处理）
+    local Decoded
+    success, err = pcall(function()
+        Decoded = HttpService:JSONDecode(configContent)
+    end)
+    
+    if not success or not Decoded then
+        Library:Notification("配置文件JSON格式错误: " .. tostring(err), 5, Color3.fromRGB(255, 0, 0))
+        return false
+    end
+    
+    -- 加载配置
+    local loadedCount = 0
+    local errorCount = 0
+    local totalFlags = 0
+    
     local Success, Result = Library:SafeCall(function()
-        for Index, Value in pairs(Decoded) do 
-            local SetFunction = Library.SetFlags[Index]
+        for FlagName, Value in pairs(Decoded) do
+            totalFlags = totalFlags + 1
+            local setFunction = Library.SetFlags[FlagName]
             
-            if not SetFunction then
-                warn("未找到标志: " .. tostring(Index))
-                continue
-            end
-
-            -- 处理不同类型的值
-            if type(Value) == "table" then
-                if Value.Key then 
-                    -- 键位绑定
-                    SetFunction(Value)
-                elseif Value.Color then
-                    -- 颜色选择器
-                    if Value.Alpha then
-                        SetFunction(Value.Color, Value.Alpha)
+            if setFunction then
+                local setSuccess, setError = pcall(function()
+                    -- 处理不同类型的配置值
+                    if type(Value) == "table" then
+                        if Value.Key then
+                            -- 键位绑定
+                            setFunction({Key = Value.Key, Mode = Value.Mode or "Toggle"})
+                        elseif Value.Color then
+                            -- 颜色选择器
+                            if Value.Alpha then
+                                setFunction(Color3.new(Value.Color[1], Value.Color[2], Value.Color[3]), Value.Alpha)
+                            else
+                                setFunction(Color3.new(Value.Color[1], Value.Color[2], Value.Color[3]))
+                            end
+                        elseif Value.Value then
+                            -- 滑块值
+                            setFunction(Value.Value)
+                        else
+                            -- 其他表类型
+                            setFunction(Value)
+                        end
                     else
-                        SetFunction(Value.Color)
+                        -- 简单值（布尔值、数字、字符串）
+                        setFunction(Value)
                     end
-                elseif Value.Value then
-                    -- 滑块值
-                    SetFunction(Value.Value)
+                end)
+                
+                if setSuccess then
+                    loadedCount = loadedCount + 1
                 else
-                    -- 普通表（可能是下拉菜单等多选值）
-                    SetFunction(Value)
+                    errorCount = errorCount + 1
+                    warn("设置标志失败 " .. FlagName .. ": " .. tostring(setError))
                 end
             else
-                -- 简单值（布尔值、数字、字符串）
-                SetFunction(Value)
+                errorCount = errorCount + 1
+                warn("未找到标志: " .. FlagName)
             end
         end
     end)
+
+    if errorCount == 0 then
+        Library:Notification(string.format("配置加载成功! (%d/%d)", loadedCount, totalFlags), 5, Color3.fromRGB(0, 255, 0))
+    else
+        Library:Notification(string.format("配置部分加载 (%d/%d 成功, %d 失败)", loadedCount, totalFlags, errorCount), 5, Color3.fromRGB(255, 165, 0))
+    end
+    
+    return loadedCount > 0
+  end
+
 
     if Success then 
         Library:Notification("配置加载成功", 5, Color3.fromRGB(0, 255, 0))
@@ -838,12 +894,63 @@ local Library do
         end
     end
 
-    Library.SaveConfig = function(self, Config)
-        if isfile(Library.Folders.Configs .. "/" .. Config) then
-            writefile(Library.Folders.Configs .. "/" .. Config, Library:GetConfig())
-            Library:Notification("Saved config " .. Config .. ".json", 5, FromRGB(0, 255, 0))
+  Library.SaveConfig = function(self, ConfigName)
+    if not ConfigName or ConfigName == "" then
+        Library:Notification("配置名不能为空", 5, Color3.fromRGB(255, 0, 0))
+        return false
+    end
+    
+    local configData = {}
+    
+    -- 收集所有标志的当前值
+    for flagName, flagData in pairs(Library.Flags) do
+        if flagData.Value ~= nil then
+            if flagData.Type == "Color" then
+                configData[flagName] = {
+                    Color = {flagData.Value.R, flagData.Value.G, flagData.Value.B},
+                    Alpha = flagData.Alpha or 1
+                }
+            elseif flagData.Type == "Keybind" then
+                configData[flagName] = {
+                    Key = flagData.Value,
+                    Mode = flagData.Mode or "Toggle"
+                }
+            else
+                configData[flagName] = flagData.Value
+            end
         end
     end
+    
+    -- JSON 编码（带错误处理）
+    local configJson
+    local success, err = pcall(function()
+        configJson = HttpService:JSONEncode(configData)
+    end)
+    
+    if not success then
+        Library:Notification("配置编码失败: " .. tostring(err), 5, Color3.fromRGB(255, 0, 0))
+        return false
+    end
+    
+    local configPath = Library.Folders.Configs .. "/" .. ConfigName
+    if not configPath:match("%.json$") then
+        configPath = configPath .. ".json"
+    end
+    
+    -- 写入文件
+    success, err = pcall(function()
+        writefile(configPath, configJson)
+    end)
+    
+    if success then
+        Library:Notification("配置保存成功: " .. ConfigName, 5, Color3.fromRGB(0, 255, 0))
+        return true
+    else
+        Library:Notification("配置保存失败: " .. tostring(err), 5, Color3.fromRGB(255, 0, 0))
+        return false
+    end
+  end
+
 
     Library.RefreshConfigsList = function(self, Element)
         local CurrentList = { }
