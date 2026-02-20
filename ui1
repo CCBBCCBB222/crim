@@ -803,7 +803,7 @@ local Library do
   Library.LoadConfig = function(self, Config)
     -- 检查Config是否为空或无效
     if not Config or type(Config) ~= "string" or #Config == 0 then
-        Library:Notification("配置内容为空或无效", 5, FromRGB(255, 0, 0))
+        Library:Notification("配置内容为空或无效", 5, Color3.fromRGB(255, 0, 0))
         return false
     end
     
@@ -813,27 +813,27 @@ local Library do
     end)
 
     if not success then
-    -- 打印详细错误信息
-       warn("JSON解码失败，错误信息: " .. tostring(Decoded))
-       warn("配置字符串长度: " .. #Config)
-       warn("前100个字符: " .. Config:sub(1, 100))
-       warn("后100个字符: " .. Config:sub(-100))
-    
-
-       for i = 1, #Config do
-          local byte = Config:byte(i)
-          if byte < 32 and byte ~= 9 and byte ~= 10 and byte ~= 13 then  -- 非空格、制表符、换行符的控制字符
-            warn("发现非法控制字符在位置 " .. i .. ": " .. byte)
-          end
-       end
-    
-       Library:Notification("JSON解析失败: " .. tostring(Decoded), 5, Color3.fromRGB(255, 0, 0))
-       return false
+        -- 打印详细错误信息
+        warn("JSON解码失败，错误信息: " .. tostring(Decoded))
+        warn("配置字符串长度: " .. #Config)
+        warn("前100个字符: " .. Config:sub(1, 100))
+        warn("后100个字符: " .. Config:sub(-100))
+        
+        -- 检查字符串是否包含非法字符
+        for i = 1, #Config do
+            local byte = Config:byte(i)
+            if byte < 32 and byte ~= 9 and byte ~= 10 and byte ~= 13 then  -- 非空格、制表符、换行符的控制字符
+                warn("发现非法控制字符在位置 " .. i .. ": " .. byte)
+            end
+        end
+        
+        Library:Notification("JSON解析失败: " .. tostring(Decoded), 5, Color3.fromRGB(255, 0, 0))
+        return false
     end
-
-   
+    
+    -- 检查解码结果是否为表格
     if type(Decoded) ~= "table" then
-        Library:Notification("配置格式错误: 应为表格类型", 5, FromRGB(255, 0, 0))
+        Library:Notification("配置格式错误: 应为表格类型", 5, Color3.fromRGB(255, 0, 0))
         return false
     end
     
@@ -843,34 +843,34 @@ local Library do
             
             if not SetFunction then
                 warn("未知的Flag: " .. tostring(Index))
-                goto continue  -- 使用goto代替continue
-            end
-            
-            -- 添加类型检查
-            if type(Value) == "table" then
-                if Value.Key then 
-                    SetFunction(Value)
-                elseif Value.Color then
-                    SetFunction(Value.Color, Value.Alpha or 1)  -- 添加默认透明度
-                else
-                    warn("不支持的表格格式: " .. tostring(Index))
-                end
+                -- 在 Luau 中，使用 continue 关键字（如果支持）或者用 if-else 结构
+                -- 这里我们使用 if-else 结构
             else
-                SetFunction(Value)
+                -- 添加类型检查
+                if type(Value) == "table" then
+                    if Value.Key then 
+                        SetFunction(Value)
+                    elseif Value.Color then
+                        SetFunction(Value.Color, Value.Alpha or 1)  -- 添加默认透明度
+                    else
+                        warn("不支持的表格格式: " .. tostring(Index))
+                    end
+                else
+                    SetFunction(Value)
+                end
             end
-            
-            ::continue::
         end
     end)
     
-    if Success then
-        Library:Notification("配置加载成功", 5, FromRGB(0, 255, 0))
-        return true
-    else
-        Library:Notification("配置加载失败: " .. tostring(Result), 5, FromRGB(255, 0, 0))
+    -- 检查 SafeCall 的执行结果
+    if not Success then
+        Library:Notification("配置应用失败: " .. tostring(Result), 5, Color3.fromRGB(255, 0, 0))
         return false
     end
+    
+    return true
   end
+
 
 
 
