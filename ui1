@@ -762,29 +762,43 @@ local Library do
   Library.GetConfig = function(self)
     local Config = {} 
     
-    -- 添加类型检查，确保 Library.Flags 是表格
-    if type(Library.Flags) ~= "table" then
-        warn("Library.Flags 不是表格类型，当前类型: " .. type(Library.Flags))
-        -- 强制转换为空表格
-        Library.Flags = {}
-    end
     
     local Success, Result = Library:SafeCall(function()
-        for Index, Value in pairs(Library.Flags) do
-            if type(Value) == "table" and Value.Key then
-                Config[Index] = {Key = tostring(Value.Key), Mode = Value.Mode or "Toggle"}
-            elseif type(Value) == "table" and Value.Color then
-                Config[Index] = {Color = Value.HexValue or "FFFFFF", Alpha = Value.Alpha or 1}
-            else
-                Config[Index] = Value
+        -- 遍历所有页面和组件，收集实际的值
+        for PageName, Page in pairs(Library.Pages) do
+            if type(Page) == "table" and Page.Components then
+                for ComponentName, Component in pairs(Page.Components) do
+                    if Component and Component.Get then
+                        -- 获取组件的实际值
+                        local value = Component:Get()
+                        if value ~= nil then
+                            Config[ComponentName] = value
+                        end
+                    end
+                end
             end
         end
+        
+        -- 添加窗口位置和大小等全局设置
+        if Library.Window then
+            Config.WindowPosition = {
+                X = Library.Window.Position.X.Scale,
+                Y = Library.Window.Position.Y.Scale
+            }
+            Config.WindowSize = {
+                Width = Library.Window.Size.X.Scale,
+                Height = Library.Window.Size.Y.Scale
+            }
+        end
+        
+        -- 添加主题设置
+        Config.Theme = Library.Theme
     end)
     
     -- 检查 SafeCall 是否成功
     if not Success then
         warn("GetConfig 执行失败: " .. tostring(Result))
-        return "{}"  -- 返回空JSON而不是nil
+        return "{}"
     end
     
     -- 安全地进行JSON编码
@@ -799,6 +813,7 @@ local Library do
     
     return jsonResult
   end
+
 
   Library.LoadConfig = function(self, Config)
     -- 检查Config是否为空或无效
