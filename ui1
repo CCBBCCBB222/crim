@@ -67,7 +67,7 @@ local Library do
 
         Folders = {
             Directory = "testpath",
-            Configs = "testpath/Configs",
+            Configs = "Configs",
             Assets = "testpath/Assets",
             Themes = "testpath/Themes"
         },
@@ -778,154 +778,37 @@ local Library do
     end
 
   Library.LoadConfig = function(self, Config)
-    -- 检查配置是否为空
-    if not Config or Config == "" then
-        Library:Notification("配置为空", 5, Color3.fromRGB(255, 0, 0))
-        return false
-    end
-    
-    -- 先进行简单的格式修复
-    local fixedConfig = Config
-    -- 修复颜色格式：添加#前缀
-    fixedConfig = string.gsub(fixedConfig, '"Color":"(%x+)"', '"Color":"#%1"')
-    
-    local success, Decoded = pcall(function()
-        return HttpService:JSONDecode(fixedConfig)
-    end)
-    
+    local success, Decoded = pcall(HttpService.JSONDecode, HttpService, Config)
     if not success then
-        -- 尝试原始配置解析
-        success, Decoded = pcall(function()
-            return HttpService:JSONDecode(Config)
-        end)
-    end
-    
-    if not success then
-        -- 提供详细的错误信息
-        local errorMsg = tostring(Decoded) or "未知错误"
-        if string.find(errorMsg, "expected") then
-            errorMsg = "JSON格式错误: 缺少引号、括号或逗号"
-        end
-        Library:Notification("配置解析失败: " .. errorMsg, 5, Color3.fromRGB(255, 0, 0))
+        Library:Notification("JSON解析失败: " .. tostring(Decoded), 5, FromRGB(255, 0, 0))
         return false
     end
-    
-    if type(Decoded) ~= "table" then
-        Library:Notification("配置数据格式不正确", 5, Color3.fromRGB(255, 0, 0))
-        return false
-    end
-    
-    print("✅ 成功解析配置，项目数:", #table.keys(Decoded))
-    
-    local loadedCount = 0
-    local errorCount = 0
-    local totalFlags = 0
     
     local Success, Result = Library:SafeCall(function()
         for Index, Value in pairs(Decoded) do 
-            totalFlags = totalFlags + 1
-            
-            -- 清理标志名：移除空格和特殊字符
-            local cleanIndex = Index
-            if string.find(cleanIndex, "Flag Number 1") then
-                -- 提取GUID部分
-                local guid = string.match(cleanIndex, "[a-f0-9%-]+$")
-                if guid then
-                    cleanIndex = guid
-                end
-            end
-            
-            local SetFunction = Library.SetFlags[cleanIndex] or Library.SetFlags[Index]
+            local SetFunction = Library.SetFlags[Index]
             
             if not SetFunction then
-                -- 尝试匹配原始标志名
-                warn("未找到标志的设置函数: " .. tostring(Index))
-                errorCount = errorCount + 1
+                warn("未知的Flag: " .. tostring(Index))
                 continue
             end
-
-            -- 增强类型处理
-            local setSuccess, setError = pcall(function()
-                if type(Value) == "table" then
-                    if Value.Key then 
-                        -- 键位绑定
-                        if type(Value.Key) == "string" and string.find(Value.Key, "Enum.KeyCode") then
-                            local keyName = string.match(Value.Key, "Enum%.KeyCode%.([%w_]+)")
-                            if keyName then
-                                local keyEnum = Enum.KeyCode[keyName]
-                                if keyEnum then
-                                    SetFunction({Key = keyEnum, Mode = Value.Mode or "Toggle"})
-                                    loadedCount = loadedCount + 1
-                                end
-                            end
-                        else
-                            SetFunction(Value)
-                            loadedCount = loadedCount + 1
-                        end
-                    elseif Value.Color then
-                        -- 颜色选择器
-                        local colorSuccess, color = pcall(function()
-                            local colorStr = Value.Color
-                            if type(colorStr) == "string" then
-                                -- 确保有#前缀
-                                if string.sub(colorStr, 1, 1) ~= "#" then
-                                    colorStr = "#" .. colorStr
-                                end
-                                return Color3.fromHex(colorStr)
-                            elseif type(colorStr) == "table" then
-                                return Color3.new(
-                                    tonumber(colorStr[1]) or 1,
-                                    tonumber(colorStr[2]) or 1,
-                                    tonumber(colorStr[3]) or 1
-                                )
-                            end
-                            return Color3.new(1, 1, 1)
-                        end)
-                        
-                        if colorSuccess and color then
-                            if Value.Alpha then
-                                SetFunction(color, tonumber(Value.Alpha) or 0)
-                            else
-                                SetFunction(color)
-                            end
-                            loadedCount = loadedCount + 1
-                        end
-                    elseif Value.Value ~= nil then
-                        -- 滑块值
-                        SetFunction(tonumber(Value.Value) or Value.Value)
-                        loadedCount = loadedCount + 1
-                    else
-                        -- 普通表
-                        SetFunction(Value)
-                        loadedCount = loadedCount + 1
-                    end
-                else
-                    -- 简单值
-                    if type(Value) == "string" and (Value == "true" or Value == "false") then
-                        SetFunction(Value == "true")
-                    else
-                        SetFunction(Value)
-                    end
-                    loadedCount = loadedCount + 1
-                end
-            end)
             
-            if not setSuccess then
-                errorCount = errorCount + 1
-                warn("设置失败 " .. Index .. ": " .. tostring(setError))
+            -- 添加类型检查
+            if type(Value) == "table" then
+                if Value.Key then 
+                    SetFunction(Value)
+                elseif Value.Color then
+                    SetFunction(Value.Color, Value.Alpha)
+                else
+                    warn("不支持的表格格式: " .. tostring(Index))
+                end
+            else
+                SetFunction(Value)
             end
         end
     end)
-
-    if Success then 
-        local msg = string.format("配置加载完成 (%d/%d 成功, %d 失败)", loadedCount, totalFlags, errorCount)
-        Library:Notification(msg, 5, Color3.fromRGB(0, 255, 0))
-        return loadedCount > 0
-    else
-        Library:Notification("配置加载异常: " .. tostring(Result), 5, Color3.fromRGB(255, 0, 0))
-        return false
-    end
   end
+
 
     Library.DeleteConfig = function(self, Config)
         if isfile(Library.Folders.Configs .. "/" .. Config) then 
