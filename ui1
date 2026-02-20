@@ -778,9 +778,7 @@ local Library do
     end
 
   Library.LoadConfig = function(self, Config)
-    local success, Decoded = pcall(function()
-        return HttpService:JSONEncode(Config)
-    end)
+    local success, Decoded = HttpService:JSONEncode(Config)
 
     if not success then
         Library:Notification("JSON解析失败: " .. tostring(Decoded), 5, FromRGB(255, 0, 0))
