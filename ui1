@@ -67,7 +67,7 @@ local Library do
 
         Folders = {
             Directory = "testpath",
-            Configs = "testpath/Configs",
+            Configs = "Configs",
             Assets = "testpath/Assets",
             Themes = "testpath/Themes"
         },
@@ -759,136 +759,49 @@ local Library do
         self.ThemeMap[Item] = ThemeData
     end
 
-  Library.GetConfig = function(self)
-    local Config = {} 
-    
-    
-    local Success, Result = Library:SafeCall(function()
-        -- 遍历所有页面和组件，收集实际的值
-        for PageName, Page in pairs(Library.Pages) do
-            if type(Page) == "table" and Page.Components then
-                for ComponentName, Component in pairs(Page.Components) do
-                    if Component and Component.Get then
-                        -- 获取组件的实际值
-                        local value = Component:Get()
-                        if value ~= nil then
-                            Config[ComponentName] = value
-                        end
-                    end
+    Library.GetConfig = function(self)
+        local Config = { } 
+
+        local Success, Result = Library:SafeCall(function()
+            for Index, Value in Library.Flags do 
+                if type(Value) == "table" and Value.Key then
+                    Config[Index] = {Key = tostring(Value.Key), Mode = Value.Mode}
+                elseif type(Value) == "table" and Value.Color then
+                    Config[Index] = {Color = Value.HexValue, Alpha = Value.Alpha}
+                else
+                    Config[Index] = Value
                 end
             end
-        end
-        
-        -- 添加窗口位置和大小等全局设置
-        if Library.Window then
-            Config.WindowPosition = {
-                X = Library.Window.Position.X.Scale,
-                Y = Library.Window.Position.Y.Scale
-            }
-            Config.WindowSize = {
-                Width = Library.Window.Size.X.Scale,
-                Height = Library.Window.Size.Y.Scale
-            }
-        end
-        
-        -- 添加主题设置
-        Config.Theme = Library.Theme
-    end)
-    
-    -- 检查 SafeCall 是否成功
-    if not Success then
-        warn("GetConfig 执行失败: " .. tostring(Result))
-        return "{}"
-    end
-    
-    -- 安全地进行JSON编码
-    local jsonSuccess, jsonResult = pcall(function()
+        end)
+
         return HttpService:JSONEncode(Config)
-    end)
-    
-    if not jsonSuccess then
-        warn("JSON编码失败: " .. tostring(jsonResult))
-        return "{}"
     end
-    
-    return jsonResult
-  end
 
+    Library.LoadConfig = function(self, Config)
+        local Decoded = HttpService:JSONDecode(Config)
 
-  Library.LoadConfig = function(self, Config)
-    -- 检查Config是否为空或无效
-    if not Config or type(Config) ~= "string" or #Config == 0 then
-        Library:Notification("配置内容为空或无效", 5, Color3.fromRGB(255, 0, 0))
-        return false
-    end
-    
-    -- 使用pcall安全解码JSON
-    local success, Decoded = pcall(function()
-        return HttpService:JSONDecode(Config)
-    end)
+        local Success, Result = Library:SafeCall(function()
+            for Index, Value in Decoded do 
+                local SetFunction = Library.SetFlags[Index]
 
-    if not success then
-        -- 打印详细错误信息
-        warn("JSON解码失败，错误信息: " .. tostring(Decoded))
-        warn("配置字符串长度: " .. #Config)
-        warn("前100个字符: " .. Config:sub(1, 100))
-        warn("后100个字符: " .. Config:sub(-100))
-        
-        -- 检查字符串是否包含非法字符
-        for i = 1, #Config do
-            local byte = Config:byte(i)
-            if byte < 32 and byte ~= 9 and byte ~= 10 and byte ~= 13 then  -- 非空格、制表符、换行符的控制字符
-                warn("发现非法控制字符在位置 " .. i .. ": " .. byte)
-            end
-        end
-        
-        Library:Notification("JSON解析失败: " .. tostring(Decoded), 5, Color3.fromRGB(255, 0, 0))
-        return false
-    end
-    
-    -- 检查解码结果是否为表格
-    if type(Decoded) ~= "table" then
-        Library:Notification("配置格式错误: 应为表格类型", 5, Color3.fromRGB(255, 0, 0))
-        return false
-    end
-    
-    local Success, Result = Library:SafeCall(function()
-        for Index, Value in pairs(Decoded) do 
-            local SetFunction = Library.SetFlags[Index]
-            
-            if not SetFunction then
-                warn("未知的Flag: " .. tostring(Index))
-                -- 在 Luau 中，使用 continue 关键字（如果支持）或者用 if-else 结构
-                -- 这里我们使用 if-else 结构
-            else
-                -- 添加类型检查
-                if type(Value) == "table" then
-                    if Value.Key then 
-                        SetFunction(Value)
-                    elseif Value.Color then
-                        SetFunction(Value.Color, Value.Alpha or 1)  -- 添加默认透明度
-                    else
-                        warn("不支持的表格格式: " .. tostring(Index))
-                    end
+                if not SetFunction then
+                    continue
+                end
+
+                if type(Value) == "table" and Value.Key then 
+                    SetFunction(Value)
+                elseif type(Value) == "table" and Value.Color then
+                    SetFunction(Value.Color, Value.Alpha)
                 else
                     SetFunction(Value)
                 end
             end
+        end)
+
+        if Success then 
+            Library:Notification("Successfully loaded config", 5, FromRGB(0, 255, 0))
         end
-    end)
-    
-    -- 检查 SafeCall 的执行结果
-    if not Success then
-        Library:Notification("配置应用失败: " .. tostring(Result), 5, Color3.fromRGB(255, 0, 0))
-        return false
     end
-    
-    return true
-  end
-
---12365
-
-
 
     Library.DeleteConfig = function(self, Config)
         if isfile(Library.Folders.Configs .. "/" .. Config) then 
@@ -1173,153 +1086,205 @@ Library.Watermark = function(self, Text, Icon)
     return Watermark
 end
 
-    Library.KeybindList = function(self)
-        local KeybindList = { }
-        Library.KeyList = KeybindList
+  Library.KeybindList = function(self)
+    local KeybindList = { 
+        ActiveKeybinds = {},  -- 存储当前激活的 Keybind
+        IsVisible = false     -- 控制整个列表的可见性
+    }
+    Library.KeyList = KeybindList
 
-        local Items = { } do 
-            Items["KeybindListOutline"] = Instances:Create("Frame", {
-                Parent = Library.Holder.Instance,
-                BorderColor3 = FromRGB(0, 0, 0),
-                AnchorPoint = Vector2New(0, 0.5),
-                Name = "\0",
-                Position = UDim2New(0, 20, 0.5, 0),
-                Size = UDim2New(0, 70, 0, 0),
-                BorderSizePixel = 0,
-                AutomaticSize = Enum.AutomaticSize.XY,
-                BackgroundColor3 = FromRGB(43, 43, 43)
-            })  Items["KeybindListOutline"]:AddToTheme({BackgroundColor3 = "Window Background", BorderColor3 = "Outline"})
+    local Items = { } do 
+        Items["KeybindListOutline"] = Instances:Create("Frame", {
+            Parent = Library.Holder.Instance,
+            BorderColor3 = FromRGB(0, 0, 0),
+            AnchorPoint = Vector2New(0, 0.5),
+            Name = "\0",
+            Position = UDim2New(0, 20, 0.5, 0),
+            Size = UDim2New(0, 70, 0, 0),
+            BorderSizePixel = 0,
+            AutomaticSize = Enum.AutomaticSize.XY,
+            BackgroundColor3 = FromRGB(43, 43, 43),
+            Visible = false  -- 初始隐藏
+        })  Items["KeybindListOutline"]:AddToTheme({BackgroundColor3 = "Window Background", BorderColor3 = "Outline"})
 
-            Items["KeybindListOutline"]:MakeDraggable()
+        Items["KeybindListOutline"]:MakeDraggable()
 
-            Instances:Create("UIStroke", {
-                Parent = Items["KeybindListOutline"].Instance,
-                Color = FromRGB(68, 68, 68),
-                LineJoinMode = Enum.LineJoinMode.Miter,
-                ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-            }):AddToTheme({Color = "Border"})
+        Instances:Create("UIStroke", {
+            Parent = Items["KeybindListOutline"].Instance,
+            Color = FromRGB(68, 68, 68),
+            LineJoinMode = Enum.LineJoinMode.Miter,
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        }):AddToTheme({Color = "Border"})
 
-            Items["Inline"] = Instances:Create("Frame", {
-                Parent = Items["KeybindListOutline"].Instance,
-                Name = "\0",
-                Position = UDim2New(0, 5, 0, 5),
-                BorderColor3 = FromRGB(68, 68, 68),
-                Size = UDim2New(1, -10, 1, -10),
-                BorderSizePixel = 2,
-                BackgroundColor3 = FromRGB(12, 12, 12)
-            })  Items["Inline"]:AddToTheme({BackgroundColor3 = "Inline", BorderColor3 = "Border"})
+        Items["Inline"] = Instances:Create("Frame", {
+            Parent = Items["KeybindListOutline"].Instance,
+            Name = "\0",
+            Position = UDim2New(0, 5, 0, 5),
+            BorderColor3 = FromRGB(68, 68, 68),
+            Size = UDim2New(1, -10, 1, -10),
+            BorderSizePixel = 2,
+            BackgroundColor3 = FromRGB(12, 12, 12)
+        })  Items["Inline"]:AddToTheme({BackgroundColor3 = "Inline", BorderColor3 = "Border"})
 
-            Instances:Create("UIStroke", {
-                Parent = Items["Inline"].Instance,
-                ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-                LineJoinMode = Enum.LineJoinMode.Miter
-            }):AddToTheme({Color = "Outline"})
+        Instances:Create("UIStroke", {
+            Parent = Items["Inline"].Instance,
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+            LineJoinMode = Enum.LineJoinMode.Miter
+        }):AddToTheme({Color = "Outline"})
 
-            Instances:Create("UIPadding", {
-                Parent = Items["Inline"].Instance,
-                PaddingTop = UDimNew(0, 7),
-                PaddingBottom = UDimNew(0, 7),
-                PaddingRight = UDimNew(0, 8),
-                PaddingLeft = UDimNew(0, 7)
-            }) 
+        Instances:Create("UIPadding", {
+            Parent = Items["Inline"].Instance,
+            PaddingTop = UDimNew(0, 7),
+            PaddingBottom = UDimNew(0, 7),
+            PaddingRight = UDimNew(0, 8),
+            PaddingLeft = UDimNew(0, 7)
+        }) 
 
-            Items["Title"] = Instances:Create("TextLabel", {
-                Parent = Items["Inline"].Instance,
-                FontFace = Library.Font,
-                TextColor3 = FromRGB(180, 180, 180),
-                BorderColor3 = FromRGB(0, 0, 0),
-                Text = "Keybinds",
-                Name = "\0",
-                Size = UDim2New(0, 0, 0, 20),
-                Position = UDim2New(0, -2, 0, -4),
-                BackgroundTransparency = 1,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                BorderSizePixel = 0,
-                AutomaticSize = Enum.AutomaticSize.X,
-                TextSize = 12,
-                BackgroundColor3 = FromRGB(255, 255, 255)
-            })  Items["Title"]:AddToTheme({TextColor3 = "Text"})
+        Items["Title"] = Instances:Create("TextLabel", {
+            Parent = Items["Inline"].Instance,
+            FontFace = Library.Font,
+            TextColor3 = FromRGB(180, 180, 180),
+            BorderColor3 = FromRGB(0, 0, 0),
+            Text = "Keybinds",
+            Name = "\0",
+            Size = UDim2New(0, 0, 0, 20),
+            Position = UDim2New(0, -2, 0, -4),
+            BackgroundTransparency = 1,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            BorderSizePixel = 0,
+            AutomaticSize = Enum.AutomaticSize.X,
+            TextSize = 12,
+            BackgroundColor3 = FromRGB(255, 255, 255)
+        })  Items["Title"]:AddToTheme({TextColor3 = "Text"})
 
-            Items["Content"] = Instances:Create("Frame", {
-                Parent = Items["Inline"].Instance,
-                Name = "\0",
-                BackgroundTransparency = 1,
-                Position = UDim2New(0, 4, 0, 21),
-                BorderColor3 = FromRGB(0, 0, 0),
-                BorderSizePixel = 0,
-                AutomaticSize = Enum.AutomaticSize.XY,
-                BackgroundColor3 = FromRGB(255, 255, 255)
-            }) 
+        Items["Content"] = Instances:Create("Frame", {
+            Parent = Items["Inline"].Instance,
+            Name = "\0",
+            BackgroundTransparency = 1,
+            Position = UDim2New(0, 4, 0, 21),
+            BorderColor3 = FromRGB(0, 0, 0),
+            BorderSizePixel = 0,
+            AutomaticSize = Enum.AutomaticSize.XY,
+            BackgroundColor3 = FromRGB(255, 255, 255)
+        }) 
 
-            Instances:Create("UIListLayout", {
-                Parent = Items["Content"].Instance,
-                Padding = UDimNew(0, 2),
-                SortOrder = Enum.SortOrder.LayoutOrder
-            }) 
+        Instances:Create("UIListLayout", {
+            Parent = Items["Content"].Instance,
+            Padding = UDimNew(0, 2),
+            SortOrder = Enum.SortOrder.LayoutOrder
+        }) 
 
-            Instances:Create("UIPadding", {
-                Parent = Items["Content"].Instance,
-                PaddingBottom = UDimNew(0, 7),
-                PaddingRight = UDimNew(0, 5)
-            }) 
+        Instances:Create("UIPadding", {
+            Parent = Items["Content"].Instance,
+            PaddingBottom = UDimNew(0, 7),
+            PaddingRight = UDimNew(0, 5)
+        }) 
 
-            Items["Liner"] = Instances:Create("Frame", {
-                Parent = Items["KeybindListOutline"].Instance,
-                Name = "\0",
-                Position = UDim2New(0, 5, 0, 5),
-                BorderColor3 = FromRGB(0, 0, 0),
-                Size = UDim2New(1, -10, 0, 2),
-                BorderSizePixel = 0,
-                BackgroundColor3 = FromRGB(31, 226, 130)
-            })  Items["Liner"]:AddToTheme({BackgroundColor3 = "Accent"})
+        Items["Liner"] = Instances:Create("Frame", {
+            Parent = Items["KeybindListOutline"].Instance,
+            Name = "\0",
+            Position = UDim2New(0, 5, 0, 5),
+            BorderColor3 = FromRGB(0, 0, 0),
+            Size = UDim2New(1, -10, 0, 2),
+            BorderSizePixel = 0,
+            BackgroundColor3 = FromRGB(31, 226, 130)
+        })  Items["Liner"]:AddToTheme({BackgroundColor3 = "Accent"})
 
-            Instances:Create("UIGradient", {
-                Parent = Items["Liner"].Instance,
-                Rotation = 90,
-                Color = RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, FromRGB(125, 125, 125))}
-            }) 
+        Instances:Create("UIGradient", {
+            Parent = Items["Liner"].Instance,
+            Rotation = 90,
+            Color = RGBSequence{RGBSequenceKeypoint(0, FromRGB(255, 255, 255)), RGBSequenceKeypoint(1, FromRGB(125, 125, 125))}
+        }) 
+    end
+
+    -- 更新可见性状态
+    function KeybindList:UpdateVisibility()
+        local hasActiveKeybinds = #KeybindList.ActiveKeybinds > 0
+        
+        if hasActiveKeybinds and not KeybindList.IsVisible then
+            -- 显示列表
+            KeybindList.IsVisible = true
+            Items["KeybindListOutline"].Instance.Visible = true
+        elseif not hasActiveKeybinds and KeybindList.IsVisible then
+            -- 隐藏列表
+            KeybindList.IsVisible = false
+            Items["KeybindListOutline"].Instance.Visible = false
+        end
+    end
+
+    function KeybindList:Add(Mode, Name, Key)
+        local NewKey = Instances:Create("TextLabel", {
+            Parent = Items["Content"].Instance,
+            FontFace = Library.Font,
+            TextColor3 = FromRGB(180, 180, 180),
+            BorderColor3 = FromRGB(0, 0, 0),
+            Text = "( " .. Mode .. " ) " .. Name .. " - " .. Key .. " ",
+            Name = "\0",
+            Size = UDim2New(0, 0, 0, 17),
+            BackgroundTransparency = 1,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            BorderSizePixel = 0,
+            AutomaticSize = Enum.AutomaticSize.X,
+            TextSize = 12,
+            BackgroundColor3 = FromRGB(255, 255, 255),
+            Visible = false  -- 初始隐藏
+        })  NewKey:AddToTheme({TextColor3 = "Text"})
+
+        local keybindData = {
+            Instance = NewKey,
+            Mode = Mode,
+            Name = Name,
+            Key = Key,
+            IsActive = false
+        }
+
+        function keybindData:Set(Mode, Name, Key)
+            self.Mode = Mode
+            self.Name = Name
+            self.Key = Key
+            self.Instance.Instance.Text = "( " .. Mode .. " ) " .. Name .. " - " .. Key .. " "
         end
 
-        function KeybindList:Add(Mode, Name, Key)
-            local NewKey = Instances:Create("TextLabel", {
-                Parent = Items["Content"].Instance,
-                FontFace = Library.Font,
-                TextColor3 = FromRGB(31, 226, 130),
-                BorderColor3 = FromRGB(0, 0, 0),
-                Text = "( " .. Mode .. " ) " .. Name .. " - " .. Key .. " ",
-                Name = "\0",
-                Size = UDim2New(0, 0, 0, 17),
-                BackgroundTransparency = 1,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                BorderSizePixel = 0,
-                AutomaticSize = Enum.AutomaticSize.X,
-                TextSize = 12,
-                BackgroundColor3 = FromRGB(255, 255, 255)
-            })  NewKey:AddToTheme({TextColor3 = "Text"})
-
-            function NewKey:Set(Mode, Name, Key)
-                NewKey.Instance.Text = "( " .. Mode .. " ) " .. Name .. " - " .. Key .. " "
-            end
-
-            function NewKey:SetStatus(Bool)
-                if Bool then 
-                    NewKey:ChangeItemTheme({TextColor3 = "Accent"})
-                    NewKey:Tween(nil, {TextColor3 = Library.Theme.Accent})
-                else
-                    NewKey:ChangeItemTheme({TextColor3 = "Text"})
-                    NewKey:Tween(nil, {TextColor3 = Library.Theme.Text})
+        function keybindData:SetStatus(Bool)
+            self.IsActive = Bool
+            
+            if Bool then 
+                -- 激活状态：显示并高亮
+                self.Instance.Instance.Visible = true
+                self.Instance:ChangeItemTheme({TextColor3 = "Accent"})
+                self.Instance:Tween(nil, {TextColor3 = Library.Theme.Accent})
+                
+                -- 添加到激活列表
+                if not TableFind(KeybindList.ActiveKeybinds, self) then
+                    TableInsert(KeybindList.ActiveKeybinds, self)
+                end
+            else
+                -- 非激活状态：隐藏
+                self.Instance.Instance.Visible = false
+                self.Instance:ChangeItemTheme({TextColor3 = "Text"})
+                self.Instance:Tween(nil, {TextColor3 = Library.Theme.Text})
+                
+                -- 从激活列表移除
+                local index = TableFind(KeybindList.ActiveKeybinds, self)
+                if index then
+                    TableRemove(KeybindList.ActiveKeybinds, index)
                 end
             end
-
-            return NewKey
+            
+            -- 更新整体可见性
+            KeybindList:UpdateVisibility()
         end
 
-        function KeybindList:SetVisibility(Bool)
-            Items["KeybindListOutline"].Instance.Visible = Bool
-        end
-
-        return KeybindList
+        return keybindData
     end
+
+    function KeybindList:SetVisibility(Bool)
+   
+    end
+
+    return KeybindList
+  end
+
 
     Library.Notification = function(self, Text, Duration, Color, Icon)
         local Items = { } do
@@ -3751,7 +3716,11 @@ end
                 Key = Keybind.Key,
                 Toggled = Keybind.Toggled
             }
-
+            
+            if KeybindListItem then
+               KeybindListItem:SetStatus(Keybind.Toggled)
+            end
+            
             if Data.Callback then 
                 Library:SafeCall(Data.Callback, Keybind.Toggled)
             end
