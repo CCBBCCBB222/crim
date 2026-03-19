@@ -2429,6 +2429,7 @@ end
             if Data.Callback then 
                 Library:SafeCall(Data.Callback, Dropdown.Value)
             end
+            
         end
 
         function Dropdown:SetVisibility(Bool)
@@ -4781,6 +4782,10 @@ end
                     Items["Avatar"].Instance.Image = PlayerAvatar
                     Items["Username"].Instance.Text = Playerlist.Player.DisplayName .. " (@" .. Playerlist.Player.Name .. ")"
                     Items["UserID"].Instance.Text = tostring(Playerlist.Player.UserId)
+                    if PlayerStatusModeDropdown then
+                       local currentStatus = PlayerData.CurrentStatus or "Neutral"
+                       PlayerStatusModeDropdown:Set(currentStatus)
+                    end
                 else
                     Playerlist.Player = nil
                     PlayerData:Toggle("Inactive")
