@@ -244,7 +244,7 @@ local function SetupInfiniteStamina()
         lastUpdate = lastUpdate + deltaTime
         if lastUpdate >= 0.5 then
             lastUpdate = 0
-            
+
             if Toggles and Toggles.InfiniteStaminaToggle and Toggles.InfiniteStaminaToggle.Value then
                 for _, tbl in pairs(StaminaTbl) do
                     tbl.S = 100
@@ -516,7 +516,7 @@ end
             })
         end
 
-        ThemesSection:Dropdown({Name = "Themes list", Items = {"Default", "Bitchbot", "Onetap", "Aqua"}, Default = "Default", Callback = function(Value)
+        ThemesSection:Dropdown({Name = "Themes list", Items = {"Default", "Bitchbot", "Onetap", "Aqua"}, Flag = "ThemesListDropdown", Default = "Default", Callback = function(Value)
             local ThemeData = Library.Themes[Value]
 
             if not ThemeData then 
@@ -703,11 +703,11 @@ end
             end
         end})
 
-        ConfigsSection:Dropdown({Name = "Style", Flag = "Tweening Style", Default = "Exponential", Items = {"Linear", "Sine", "Quad", "Cubic", "Quart", "Quint", "Exponential", "Circular", "Back", "Elastic", "Bounce"}, Callback = function(Value)
+        ConfigsSection:Dropdown({Name = "Style", Flag = "TweeningStyleDropdown", Default = "Exponential", Items = {"Linear", "Sine", "Quad", "Cubic", "Quart", "Quint", "Exponential", "Circular", "Back", "Elastic", "Bounce"}, Callback = function(Value)
             Library.Tween.Style = Enum.EasingStyle[Value]
         end})
 
-        ConfigsSection:Dropdown({Name = "Direction", Flag = "Tweening Direction", Default = "Out", Items = {"In", "Out", "InOut"}, Callback = function(Value)
+        ConfigsSection:Dropdown({Name = "Direction", Flag = "TweeningDirectionDropdown", Default = "Out", Items = {"In", "Out", "InOut"}, Callback = function(Value)
             Library.Tween.Direction = Enum.EasingDirection[Value]
         end})
 
