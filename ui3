@@ -3539,7 +3539,7 @@ end
     local Modes = {
         ["Toggle"] = Items["Toggle"],
         ["Hold"] = Items["Hold"],
-        ["Always"] = Items["Always"]
+        ["Always"] = Items["Always"],
         ["None"] = Items["None"]
         
     }
