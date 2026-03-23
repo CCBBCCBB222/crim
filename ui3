@@ -1003,7 +1003,7 @@ Library.Watermark = function(self, Text, Icon)
     function Watermark:UpdatePing(ping)
         if Items["Text"] and Items["Text"].Instance then
             local currentText = Items["Text"].Instance.Text
-            
+
             local fps = currentText:match("fps: (%d+)")
             if fps then
                 Items["Text"].Instance.Text = string.format("%s fps: %s | %d ms", Text, fps, ping or 0)
@@ -1016,24 +1016,24 @@ Library.Watermark = function(self, Text, Icon)
         Items["Watermark"].Instance.Visible = Bool
     end
 
-    
+
     function Watermark:SetText(NewText)
         if Items["Text"] and Items["Text"].Instance then
             Items["Text"].Instance.Text = NewText
         end
     end
 
-    
+
     function Watermark:GetPosition()
         return Items["Watermark"].Instance.Position
     end
 
-    
+
     function Watermark:SetPosition(Position)
         Items["Watermark"].Instance.Position = Position
     end
 
-    
+
     function Watermark:Destroy()
         for _, item in pairs(Items) do
             if item and item.Instance then
@@ -1156,16 +1156,16 @@ end
         }) 
     end
 
-    
+
     function KeybindList:UpdateVisibility()
         local hasActiveKeybinds = #KeybindList.ActiveKeybinds > 0
-        
+
         if hasActiveKeybinds and not KeybindList.IsVisible then
-            
+
             KeybindList.IsVisible = true
             Items["KeybindListOutline"].Instance.Visible = true
         elseif not hasActiveKeybinds and KeybindList.IsVisible then
-            
+
             KeybindList.IsVisible = false
             Items["KeybindListOutline"].Instance.Visible = false
         end
@@ -1206,31 +1206,31 @@ end
 
         function keybindData:SetStatus(Bool)
             self.IsActive = Bool
-            
+
             if Bool then 
-                
+
                 self.Instance.Instance.Visible = true
                 self.Instance:ChangeItemTheme({TextColor3 = "Accent"})
                 self.Instance:Tween(nil, {TextColor3 = Library.Theme.Accent})
-                
-                
+
+
                 if not TableFind(KeybindList.ActiveKeybinds, self) then
                     TableInsert(KeybindList.ActiveKeybinds, self)
                 end
             else
-                
+
                 self.Instance.Instance.Visible = false
                 self.Instance:ChangeItemTheme({TextColor3 = "Text"})
                 self.Instance:Tween(nil, {TextColor3 = Library.Theme.Text})
-                
-                
+
+
                 local index = TableFind(KeybindList.ActiveKeybinds, self)
                 if index then
                     TableRemove(KeybindList.ActiveKeybinds, index)
                 end
             end
-            
-            
+
+
             KeybindList:UpdateVisibility()
         end
 
@@ -1238,8 +1238,8 @@ end
     end
 
     function KeybindList:SetVisibility(Bool)
-        
-        
+
+
     end
 
     return KeybindList
@@ -2388,7 +2388,7 @@ end
             if Data.Callback then 
                 Library:SafeCall(Data.Callback, Dropdown.Value)
             end
-            
+
         end
 
         function Dropdown:SetVisibility(Bool)
@@ -3418,10 +3418,10 @@ end
 
     local KeybindListItem
 
-    
+
     if Library.KeyList then 
         KeybindListItem = Library.KeyList:Add("None", Data.Name, "None")
-        
+
         KeybindListItem:SetStatus(false)
     end
 
@@ -3516,25 +3516,51 @@ end
             TextSize = 12,
             BackgroundColor3 = FromRGB(31, 226, 130)
         })  Items["Always"]:AddToTheme({TextColor3 = "Text"})
+        
+        Items["None"] = Instances:Create("TextButton", {
+    Parent = Items["KeybindWindow"]["Outline"].Instance,
+    TextWrapped = true,
+    TextColor3 = FromRGB(180, 180, 180),
+    BorderColor3 = FromRGB(0, 0, 0),
+    Text = "None",
+    AutoButtonColor = false,
+    Name = "\0",
+    Size = UDim2New(1, 0, 0, 15),
+    BackgroundTransparency = 1,
+    Position = UDim2New(0, 0, 0, 74), -- 调整位置
+    BorderSizePixel = 0,
+    FontFace = Library.Font,
+    TextSize = 12,
+    BackgroundColor3 = FromRGB(31, 226, 130)
+}) Items["None"]:AddToTheme({TextColor3 = "Text"})
+
     end
 
     local Modes = {
         ["Toggle"] = Items["Toggle"],
         ["Hold"] = Items["Hold"],
         ["Always"] = Items["Always"]
+        ["None"] = Items["None"]
+        
     }
 
     local Debounce = false
 
-    
-    local function UpdateKeybindList()
-        if KeybindListItem then
-            
+
+  local function UpdateKeybindList()
+    if KeybindListItem then
+        -- 如果是 None 模式，不显示在快捷键列表中
+        if Keybind.Mode == "None" then
+            KeybindListItem:SetStatus(false)
+            KeybindListItem.Instance.Visible = false
+        else
             KeybindListItem:Set(Keybind.Mode, Data.Name, Keybind.Value)
-            
             KeybindListItem:SetStatus(Keybind.Toggled)
+            KeybindListItem.Instance.Visible = true
         end
     end
+  end
+
 
     function Keybind:Get()
        return Keybind.Toggled, Keybind.Key, Keybind.Mode 
@@ -3579,6 +3605,9 @@ end
 
     function Keybind:Set(Key)
         if StringFind(tostring(Key), "Enum") then 
+            if Keybind.Mode == "None" then
+               return
+            end
             Keybind.Key = tostring(Key)
 
             Key = Key.Name == "Backspace" and "[-]" or Key.Name
@@ -3595,7 +3624,7 @@ end
                 Toggled = Keybind.Toggled
             }
 
-            
+
             UpdateKeybindList()
 
             if Data.Callback then 
@@ -3629,7 +3658,7 @@ end
             Keybind.Value = TextToDisplay
             Items["KeyButton"].Instance.Text = TextToDisplay
 
-            
+
             UpdateKeybindList()
 
             if Data.Callback then 
@@ -3654,9 +3683,14 @@ end
         end
 
         if Keybind.Mode == "Always" then 
-            Keybind.Toggled = true
+          Keybind.Toggled = true
+        elseif Keybind.Mode == "None" then
+          Keybind.Toggled = false
+        -- 在 None 模式下隐藏快捷键显示
+          Items["KeyButton"].Instance.Visible = false
         else
-            Keybind.Toggled = false
+          Keybind.Toggled = false
+          Items["KeyButton"].Instance.Visible = true
         end
 
         Library.Flags[Keybind.Flag] = {
@@ -3665,7 +3699,7 @@ end
             Toggled = Keybind.Toggled
         }
 
-        
+
         UpdateKeybindList()
 
         if Data.Callback then 
@@ -3673,7 +3707,12 @@ end
         end
     end
 
+
+
     function Keybind:Press(Bool)
+        if Keybind.Mode == "None" then
+          return
+        end
         if Keybind.Mode == "Toggle" then
             Keybind.Toggled = not Keybind.Toggled
         elseif Keybind.Mode == "Hold" then
@@ -3688,7 +3727,7 @@ end
             Toggled = Keybind.Toggled
         }
 
-        
+
         UpdateKeybindList()
 
         if Data.Callback then 
@@ -3769,7 +3808,12 @@ end
         Keybind.Mode = "Hold"
         Keybind:SetMode("Hold")
     end)
-
+    
+    Items["None"]:Connect("MouseButton1Down", function()
+      Keybind.Mode = "None"
+      Keybind:SetMode("None")
+    end)
+    
     if Data.Default then 
         Keybind:Set({Key = Data.Default, Mode = Data.Mode})
     end
