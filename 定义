@@ -1,0 +1,45 @@
+
+return function()
+    local Workspace, RunService, Players, CoreGui, Lighting, ReplicatedStorage, UserInputService = 
+        cloneref(game:GetService("Workspace")), 
+        cloneref(game:GetService("RunService")), 
+        cloneref(game:GetService("Players")), 
+        game:GetService("CoreGui"), 
+        cloneref(game:GetService("Lighting")),
+        game:GetService("ReplicatedStorage"),
+        game:GetService("UserInputService")
+
+    local LocalPlayer, Camera, events, GNX_S, ZFKLF__H, GNX_R, player = 
+        Players.LocalPlayer,
+        Workspace.CurrentCamera,
+        ReplicatedStorage:WaitForChild("Events"),
+        events:WaitForChild("GNX_S"),
+        events:WaitForChild("ZFKLF__H"),
+        events:WaitForChild("GNX_R"),
+        Players.LocalPlayer
+
+    
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    local rootPart = character:WaitForChild("HumanoidRootPart")
+
+    return {
+        Workspace = Workspace,
+        RunService = RunService,
+        Players = Players,
+        CoreGui = CoreGui,
+        Lighting = Lighting,
+        ReplicatedStorage = ReplicatedStorage,
+        UserInputService = UserInputService,
+        LocalPlayer = LocalPlayer,
+        Camera = Camera,
+        events = events,
+        GNX_S = GNX_S,
+        ZFKLF__H = ZFKLF__H,
+        GNX_R = GNX_R,
+        player = player,
+        character = character,
+        humanoid = humanoid,
+        rootPart = rootPart
+    }
+end
